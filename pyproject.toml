@@ -28,5 +28,5 @@ exclude = '''
 '''
 
 [tool.ruff.lint.isort]
-known_first_party = ["storesales"]
-force_sort_within_sections = true
+known-first-party = ["storesales"]
+force-sort-within-sections = true
