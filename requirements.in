@@ -1,0 +1,6 @@
+ruff
+jupyter
+mlflow
+optuna
+plotly
+seaborn
