@@ -1,4 +1,5 @@
 ruff
+streamlit
 jupyter
 mlflow
 optuna

@@ -8,6 +8,8 @@ alembic==1.13.2
     # via
     #   mlflow
     #   optuna
+altair==5.4.1
+    # via streamlit
 aniso8601==9.0.1
     # via graphene
 anyio==4.4.0
@@ -28,6 +30,7 @@ attrs==24.2.0
     # via
     #   jsonschema
     #   referencing
+    #   streamlit
 babel==2.16.0
     # via jupyterlab-server
 beautifulsoup4==4.12.3
@@ -35,11 +38,14 @@ beautifulsoup4==4.12.3
 bleach==6.1.0
     # via nbconvert
 blinker==1.8.2
-    # via flask
+    # via
+    #   flask
+    #   streamlit
 cachetools==5.5.0
     # via
     #   google-auth
     #   mlflow-skinny
+    #   streamlit
 certifi==2024.8.30
     # via
     #   httpcore
@@ -53,6 +59,7 @@ click==8.1.7
     # via
     #   flask
     #   mlflow-skinny
+    #   streamlit
 cloudpickle==3.0.0
     # via mlflow-skinny
 colorlog==6.8.2
@@ -92,7 +99,9 @@ fqdn==1.5.1
 gitdb==4.0.11
     # via gitpython
 gitpython==3.1.43
-    # via mlflow-skinny
+    # via
+    #   mlflow-skinny
+    #   streamlit
 google-auth==2.34.0
     # via databricks-sdk
 graphene==3.3
@@ -123,6 +132,7 @@ importlib-metadata==8.4.0
     # via
     #   mlflow-skinny
     #   opentelemetry-api
+    #   streamlit
 ipykernel==6.29.5
     # via
     #   jupyter
@@ -143,12 +153,14 @@ jedi==0.19.1
     # via ipython
 jinja2==3.1.4
     # via
+    #   altair
     #   flask
     #   jupyter-server
     #   jupyterlab
     #   jupyterlab-server
     #   mlflow
     #   nbconvert
+    #   pydeck
 joblib==1.4.2
     # via scikit-learn
 json5==0.9.25
@@ -157,6 +169,7 @@ jsonpointer==3.0.0
     # via jsonschema
 jsonschema[format-nongpl]==4.23.0
     # via
+    #   altair
     #   jupyter-events
     #   jupyterlab-server
     #   nbformat
@@ -233,6 +246,8 @@ mlflow==2.16.0
     # via -r requirements.in
 mlflow-skinny==2.16.0
     # via mlflow
+narwhals==1.8.1
+    # via altair
 nbclient==0.10.0
     # via nbconvert
 nbconvert==7.16.4
@@ -260,9 +275,11 @@ numpy==2.1.1
     #   optuna
     #   pandas
     #   pyarrow
+    #   pydeck
     #   scikit-learn
     #   scipy
     #   seaborn
+    #   streamlit
 opentelemetry-api==1.27.0
     # via
     #   mlflow-skinny
@@ -278,6 +295,7 @@ overrides==7.7.0
     # via jupyter-server
 packaging==24.1
     # via
+    #   altair
     #   gunicorn
     #   ipykernel
     #   jupyter-server
@@ -288,10 +306,12 @@ packaging==24.1
     #   nbconvert
     #   optuna
     #   plotly
+    #   streamlit
 pandas==2.2.2
     # via
     #   mlflow
     #   seaborn
+    #   streamlit
 pandocfilters==1.5.1
     # via nbconvert
 parso==0.8.4
@@ -299,7 +319,9 @@ parso==0.8.4
 pexpect==4.9.0
     # via ipython
 pillow==10.4.0
-    # via matplotlib
+    # via
+    #   matplotlib
+    #   streamlit
 platformdirs==4.3.2
     # via jupyter-core
 plotly==5.24.1
@@ -311,7 +333,9 @@ prompt-toolkit==3.0.47
     #   ipython
     #   jupyter-console
 protobuf==5.28.1
-    # via mlflow-skinny
+    # via
+    #   mlflow-skinny
+    #   streamlit
 psutil==6.0.0
     # via ipykernel
 ptyprocess==0.7.0
@@ -321,7 +345,9 @@ ptyprocess==0.7.0
 pure-eval==0.2.3
     # via stack-data
 pyarrow==17.0.0
-    # via mlflow
+    # via
+    #   mlflow
+    #   streamlit
 pyasn1==0.6.1
     # via
     #   pyasn1-modules
@@ -330,11 +356,15 @@ pyasn1-modules==0.4.1
     # via google-auth
 pycparser==2.22
     # via cffi
+pydeck==0.9.1
+    # via streamlit
 pygments==2.18.0
     # via
     #   ipython
     #   jupyter-console
     #   nbconvert
+pympler==1.1
+    # via streamlit
 pyparsing==3.1.4
     # via matplotlib
 python-dateutil==2.9.0.post0
@@ -343,6 +373,7 @@ python-dateutil==2.9.0.post0
     #   jupyter-client
     #   matplotlib
     #   pandas
+    #   streamlit
 python-json-logger==2.0.7
     # via jupyter-events
 pytz==2024.2
@@ -369,6 +400,7 @@ requests==2.32.3
     #   docker
     #   jupyterlab-server
     #   mlflow-skinny
+    #   streamlit
 rfc3339-validator==0.1.4
     # via
     #   jsonschema
@@ -393,6 +425,8 @@ scipy==1.14.1
     #   scikit-learn
 seaborn==0.13.2
     # via -r requirements.in
+semver==3.0.2
+    # via streamlit
 send2trash==1.8.3
     # via jupyter-server
 six==1.16.0
@@ -418,6 +452,8 @@ sqlparse==0.5.1
     # via mlflow-skinny
 stack-data==0.6.3
     # via ipython
+streamlit==1.8.0
+    # via -r requirements.in
 tenacity==9.0.0
     # via plotly
 terminado==0.18.1
@@ -428,6 +464,8 @@ threadpoolctl==3.5.0
     # via scikit-learn
 tinycss2==1.3.0
     # via nbconvert
+toml==0.10.2
+    # via streamlit
 tornado==6.4.1
     # via
     #   ipykernel
@@ -435,6 +473,7 @@ tornado==6.4.1
     #   jupyter-server
     #   jupyterlab
     #   notebook
+    #   streamlit
     #   terminado
 tqdm==4.66.5
     # via optuna
@@ -459,17 +498,24 @@ types-python-dateutil==2.9.0.20240906
 typing-extensions==4.12.2
     # via
     #   alembic
+    #   altair
     #   ipython
     #   opentelemetry-sdk
     #   sqlalchemy
 tzdata==2024.1
     # via pandas
+tzlocal==5.2
+    # via streamlit
 uri-template==1.3.0
     # via jsonschema
 urllib3==2.2.3
     # via
     #   docker
     #   requests
+validators==0.34.0
+    # via streamlit
+watchdog==5.0.2
+    # via streamlit
 wcwidth==0.2.13
     # via prompt-toolkit
 webcolors==24.8.0
