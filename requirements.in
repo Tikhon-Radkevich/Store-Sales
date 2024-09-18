@@ -5,3 +5,6 @@ mlflow
 optuna
 plotly
 seaborn
+streamlit-pandas-profiling
+ydata-profiling
+-e .
