@@ -23,3 +23,6 @@ EXTERNAL_HOLIDAYS_EVENTS_PATH = os.path.join(EXTERNAL_DATA_PATH, "holidays_event
 EXTERNAL_SAMPLE_SUBMISSION_PATH = os.path.join(
     EXTERNAL_DATA_PATH, "sample_submission.csv"
 )
+
+REPORTS_PATH = os.path.join(ROOT_PATH, "reports")
+SUBMISSIONS_PATH = os.path.join(DATA_PATH, "submissions")
