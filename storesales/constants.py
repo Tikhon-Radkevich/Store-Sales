@@ -26,3 +26,6 @@ EXTERNAL_SAMPLE_SUBMISSION_PATH = os.path.join(
 
 REPORTS_PATH = os.path.join(ROOT_PATH, "reports")
 SUBMISSIONS_PATH = os.path.join(DATA_PATH, "submissions")
+
+START_TEST_DATE = "2017-08-16"
+END_TEST_DATE = "2017-08-31"
