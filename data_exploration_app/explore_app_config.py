@@ -38,7 +38,7 @@ data_description = {
         * transferred
         """,
     "sample_submission": """
-        This file contains the sample submission format.
+        This file contains the sample submissions format.
         * id
         * sales
         """,
