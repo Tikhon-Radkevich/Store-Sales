@@ -5,7 +5,8 @@ import streamlit as st
 from ydata_profiling import ProfileReport
 from streamlit_pandas_profiling import st_profile_report
 
-from descr import data_description, profile_kwargs
+from explore_app_config import profile_kwargs
+from dataset_utils.holidays import get_sales
 from storesales.explore.utils import get_holidays_on_sales_fig, get_oil_dcoilwtico_fig
 from storesales.constants import (
     EXTERNAL_DATA_PATH,
@@ -28,7 +29,20 @@ class DataRenderer:
     def render_holidays_events() -> None:
         train_df = DataLoader.load_train_data()
         holidays_df = DataLoader.load_holidays_events_data()
-        sales_df = train_df.groupby(["date"])["sales"].sum().reset_index()
+
+        slider_col, select_box_col = st.columns(2)
+        with slider_col:
+            store_nbr = st.slider("Store Number", 0, 54)
+            if store_nbr == 0:
+                store_nbr = None
+
+        with select_box_col:
+            family_options = ["All"] + train_df["family"].unique().tolist()
+            family = st.selectbox("Family", family_options)
+            if family == "All":
+                family = None
+
+        sales_df = get_sales(train_df, store_nbr, family)
         fig = get_holidays_on_sales_fig(sales_df, holidays_df)
         st.plotly_chart(fig, use_container_width=True)
 
@@ -112,7 +126,7 @@ class DataLoader:
 
 
 def render_profile_report(data: pd.DataFrame, file_name: str) -> None:
-    profile_kwargs["dataset"]["description"] = data_description[file_name]
+    profile_kwargs["title"] = f"Profile Report: {file_name}.csv"
 
     @st.cache_data
     def _get_profile_report(df: pd.DataFrame) -> ProfileReport:
