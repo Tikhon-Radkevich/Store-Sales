@@ -1,4 +1,6 @@
+numpy < 2.0
 ruff
+prophet
 streamlit
 jupyter
 mlflow

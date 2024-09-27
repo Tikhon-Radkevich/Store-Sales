@@ -4,6 +4,8 @@
 #
 #    pip-compile --output-file=requirements.txt
 #
+-e file:///home/tikhon/PycharmProjects/StoreSales
+    # via -r requirements.in
 alembic==1.13.2
     # via
     #   mlflow
@@ -64,6 +66,8 @@ click==8.1.7
     #   streamlit
 cloudpickle==3.0.0
     # via mlflow-skinny
+cmdstanpy==1.2.4
+    # via prophet
 colorlog==6.8.2
     # via optuna
 comm==0.2.2
@@ -126,6 +130,8 @@ gunicorn==23.0.0
     # via mlflow
 h11==0.14.0
     # via httpcore
+holidays==0.57
+    # via prophet
 htmlmin==0.1.12
     # via ydata-profiling
 httpcore==1.0.5
@@ -146,6 +152,8 @@ importlib-metadata==8.4.0
     # via
     #   mlflow-skinny
     #   opentelemetry-api
+importlib-resources==6.4.5
+    # via prophet
 ipykernel==6.29.5
     # via
     #   jupyter
@@ -256,6 +264,7 @@ matplotlib==3.9.2
     # via
     #   mlflow
     #   phik
+    #   prophet
     #   seaborn
     #   wordcloud
     #   ydata-profiling
@@ -300,8 +309,10 @@ notebook-shim==0.2.4
     #   notebook
 numba==0.60.0
     # via ydata-profiling
-numpy==2.0.2
+numpy==1.26.4
     # via
+    #   -r requirements.in
+    #   cmdstanpy
     #   contourpy
     #   imagehash
     #   matplotlib
@@ -311,12 +322,14 @@ numpy==2.0.2
     #   pandas
     #   patsy
     #   phik
+    #   prophet
     #   pyarrow
     #   pydeck
     #   pywavelets
     #   scikit-learn
     #   scipy
     #   seaborn
+    #   stanio
     #   statsmodels
     #   streamlit
     #   visions
@@ -352,8 +365,10 @@ packaging==24.1
     #   streamlit
 pandas==2.2.2
     # via
+    #   cmdstanpy
     #   mlflow
     #   phik
+    #   prophet
     #   seaborn
     #   statsmodels
     #   streamlit
@@ -388,6 +403,8 @@ prompt-toolkit==3.0.47
     # via
     #   ipython
     #   jupyter-console
+prophet==1.1.5
+    # via -r requirements.in
 protobuf==5.28.1
     # via
     #   mlflow-skinny
@@ -429,6 +446,7 @@ pyparsing==3.1.4
 python-dateutil==2.9.0.post0
     # via
     #   arrow
+    #   holidays
     #   jupyter-client
     #   matplotlib
     #   pandas
@@ -521,6 +539,8 @@ sqlparse==0.5.1
     # via mlflow-skinny
 stack-data==0.6.3
     # via ipython
+stanio==0.5.1
+    # via cmdstanpy
 statsmodels==0.14.3
     # via ydata-profiling
 streamlit==1.38.0
@@ -556,7 +576,9 @@ tornado==6.4.1
     #   terminado
 tqdm==4.66.5
     # via
+    #   cmdstanpy
     #   optuna
+    #   prophet
     #   ydata-profiling
 traitlets==5.14.3
     # via
