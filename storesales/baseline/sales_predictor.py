@@ -172,17 +172,38 @@ class SalesPredictor:
         if not self.best_storage:
             raise ValueError("Sales Predictor has not been tuned.")
 
+        store_nbrs = train["store_nbr"].unique()
         # if not self.models:
         for family, args in self.best_storage.items():
-            print(family)
-            print(args)
-            model = self.get_best_model(args["params"])
-            print(model)
-            self.models[family] = model
+            for store_nbr in store_nbrs:
+                model = self.get_best_model(args["params"])
+                self.models[(store_nbr, family)] = model
 
-        # todo: get dataset for each family-store from train
-        for family, model in tqdm(self.models.items()):
-            model.fit(train)
+        for (store_nbr, family), model in tqdm(self.models.items()):
+            x_train = train[(train["store_nbr"] == store_nbr) & (train["family"] == family)]
+            last_730_days = x_train[x_train['ds'] >= x_train['ds'].max() - pd.DateOffset(days=730)]
+            model.fit(last_730_days)
+
+    def predict(self, test: pd.DataFrame, submission: pd.DataFrame) -> pd.DataFrame:
+        prediction_list = []
+
+        for (store_nbr, family), model in tqdm(self.models.items()):
+            x_test = test[(test["store_nbr"] == store_nbr) & (test["family"] == family)]
+
+            forecast = model.predict(x_test)[["ds", "yhat"]]
+
+            forecast["store_nbr"] = store_nbr
+            forecast["family"] = family
+
+            x_test = x_test.merge(forecast, on=["store_nbr", "family", "ds"], how="left")
+            prediction_list.append(x_test)
+
+        predictions = pd.concat(prediction_list, ignore_index=True)
+
+        predictions.set_index("id", inplace=True)
+        submission["sales"] = predictions["yhat"]
+
+        return submission
 
     def evaluate_and_save_tune(
         self,
