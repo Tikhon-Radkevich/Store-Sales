@@ -12,5 +12,6 @@ class DailyMeanModel:
     def predict(self, future: pd.DataFrame) -> pd.DataFrame:
         if self.prediction is None:
             raise ValueError("Model not fitted")
-        future["yhat"] = [self.prediction] * len(future)
-        return future
+        prediction = future.copy()
+        prediction["yhat"] = [self.prediction] * len(future)
+        return prediction
