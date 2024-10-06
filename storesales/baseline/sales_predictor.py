@@ -5,155 +5,19 @@ import pandas as pd
 import numpy as np
 
 import optuna
-from prophet import Prophet
-from prophet.diagnostics import cross_validation
 
-from storesales.baseline.stat_models import DailyMeanModel
-
-
-def rmsle(y_true, y_pred):
-    return np.sqrt(np.mean(np.square(np.log1p(y_true) - np.log1p(y_pred))))
-
-
-class ModelWrapper:
-    pass
-
-
-class DailyMeanModelWrapper(ModelWrapper):
-    def __init__(self):
-        super().__init__()
-
-    @staticmethod
-    def render(**kwargs) -> str:
-        return f"DailyMeanModel({kwargs['window']})"
-
-    @staticmethod
-    def get_model(**kwargs) -> DailyMeanModel:
-        return DailyMeanModel(**kwargs)
-
-    def objective(
-        self, trial: optuna.Trial, df: pd.DataFrame, cutoffs: pd.DataFrame
-    ) -> float:
-        model = self.get_model(window=trial.suggest_int("window", 5, 50))
-
-        losses = []
-        for cutoff in cutoffs:
-            train_condition = df["ds"] < cutoff
-            train = df[train_condition]
-            future = df[~train_condition][:16]
-
-            model.fit(train)
-            forecast = model.predict(future)
-
-            y_pred = forecast["yhat"].values
-            y_true = forecast["y"].values
-
-            losses.append(rmsle(y_true, y_pred))
-
-        return np.mean(losses)
-
-    @staticmethod
-    def get_best_model(best_params, best_model_name) -> dict:
-        mean_params = {
-            "window": int(np.mean(best_params["window"])),
-            "model": best_model_name,
-        }
-        return mean_params
-
-
-class ProphetWrapper(ModelWrapper):
-    def __init__(
-        self,
-        extra_regressors: list[str] = None,
-        holidays=None,
-        horizon="16 days",
-        initial="730 days",
-    ):
-        self.extra_regressors = extra_regressors
-        self.holidays = holidays
-        self.horizon = horizon
-        self.initial = initial
-
-        self.daily_seasonality = False
-        self.weekly_seasonality = True
-        self.yearly_seasonality = True
-        self.uncertainty_samples = False
-
-        super().__init__()
-
-    def get_model(self, **kwargs) -> Prophet:
-        prophet = Prophet(
-            daily_seasonality=self.daily_seasonality,
-            weekly_seasonality=self.weekly_seasonality,
-            yearly_seasonality=self.yearly_seasonality,
-            uncertainty_samples=self.uncertainty_samples,
-            holidays=self.holidays,
-            **kwargs,
-        )
-
-        if self.extra_regressors is not None:
-            for regressor in self.extra_regressors:
-                prophet.add_regressor(regressor)
-
-        return prophet
-
-    def objective(
-        self, trial: optuna.Trial, train: pd.DataFrame, cutoffs: pd.DataFrame
-    ) -> float:
-        model = self.get_model(
-            # growth=trial.suggest_categorical("growth", ["linear", "flat"]),
-            # n_changepoints=trial.suggest_int("n_changepoints", 2, 50),
-            changepoint_prior_scale=trial.suggest_float(
-                "changepoint_prior_scale", 0.001, 0.5
-            ),
-            seasonality_prior_scale=trial.suggest_int("seasonality_prior_scale", 2, 20),
-            # seasonality_mode=trial.suggest_categorical("seasonality_mode", ["additive", "multiplicative"])
-        ).fit(train)
-
-        df_cv = cross_validation(
-            model,
-            horizon=self.horizon,
-            initial=self.initial,
-            cutoffs=cutoffs,
-            disable_tqdm=True,
-            parallel="processes",
-        )
-        df_cv["yhat"] = df_cv["yhat"].clip(lower=0)
-        loss = (
-            df_cv.groupby("cutoff")[["y", "yhat"]]
-            .apply(lambda group: rmsle(group["y"], group["yhat"]))
-            .mean()
-        )
-        return loss
-
-    @staticmethod
-    def render(**kwargs) -> str:
-        return "ProphetWrapper"
-
-    @staticmethod
-    def get_best_model(best_params, best_model_name) -> dict:
-        mean_params = {
-            "model": best_model_name,
-            "changepoint_prior_scale": np.mean(best_params["changepoint_prior_scale"]),
-            "seasonality_prior_scale": int(
-                np.mean(best_params["seasonality_prior_scale"])
-            ),
-        }
-        return mean_params
+from storesales.baseline.model_wrappers import ModelBaseWrapper
+from storesales.baseline.utils import rmsle
 
 
 class SalesPredictor:
     def __init__(
         self,
-        prophet_wrapper: ProphetWrapper,
-        daily_wrapper: DailyMeanModel,
+        model_wrappers: dict[str, ModelBaseWrapper],
         inner_cutoffs: list[int],
         family_groups: list[set[str]],
     ):
-        self.model_wrappers = {
-            DailyMeanModelWrapper.__name__: daily_wrapper,
-            ProphetWrapper.__name__: prophet_wrapper,
-        }
+        self.model_wrappers = model_wrappers
         self.inner_cutoffs = inner_cutoffs
         self.family_groups = family_groups
 
@@ -179,10 +43,15 @@ class SalesPredictor:
                 model = self.get_best_model(args["params"])
                 self.models[(store_nbr, family)] = model
 
+        last_730_days = train[
+            train["ds"] >= train["ds"].max() - pd.DateOffset(days=730)
+        ]
         for (store_nbr, family), model in tqdm(self.models.items()):
-            x_train = train[(train["store_nbr"] == store_nbr) & (train["family"] == family)]
-            last_730_days = x_train[x_train['ds'] >= x_train['ds'].max() - pd.DateOffset(days=730)]
-            model.fit(last_730_days)
+            x_train = last_730_days[
+                (last_730_days["store_nbr"] == store_nbr)
+                & (last_730_days["family"] == family)
+            ]
+            model.fit(x_train)
 
     def predict(self, test: pd.DataFrame, submission: pd.DataFrame) -> pd.DataFrame:
         prediction_list = []
@@ -195,7 +64,9 @@ class SalesPredictor:
             forecast["store_nbr"] = store_nbr
             forecast["family"] = family
 
-            x_test = x_test.merge(forecast, on=["store_nbr", "family", "ds"], how="left")
+            x_test = x_test.merge(
+                forecast, on=["store_nbr", "family", "ds"], how="left"
+            )
             prediction_list.append(x_test)
 
         predictions = pd.concat(prediction_list, ignore_index=True)
@@ -245,7 +116,7 @@ class SalesPredictor:
         cutoffs = train["ds"].iloc[self.inner_cutoffs].reset_index(drop=True)
         return self.model_wrappers[model_name].objective(trial, train, cutoffs)
 
-    def get_best_model(self, best_params) -> DailyMeanModel | Prophet:
+    def get_best_model(self, best_params) -> ModelBaseWrapper:
         best_params = best_params.copy()
         model_name = best_params.pop("model")
         return self.model_wrappers[model_name].get_model(**best_params)
