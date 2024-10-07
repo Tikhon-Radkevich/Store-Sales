@@ -6,8 +6,12 @@ from prophet import Prophet
 from prophet.diagnostics import cross_validation
 
 from storesales.baseline.stat_models import DailyMeanModel, DayOfWeekMeanModel
-from storesales.baseline.param_suggestions import IntSuggestions, FloatSuggestions, CategoricalSuggestions
-from storesales.baseline.utils import rmsle
+from storesales.baseline.param_suggestions import (
+    IntSuggestions,
+    FloatSuggestions,
+    CategoricalSuggestions,
+)
+from storesales.baseline.loss import rmsle
 
 
 class ModelBaseWrapper:
@@ -38,7 +42,7 @@ class ModelBaseWrapper:
         return model
 
     def objective(
-            self, trial: optuna.Trial, df: pd.DataFrame, cutoffs: pd.DataFrame
+        self, trial: optuna.Trial, df: pd.DataFrame, cutoffs: pd.DataFrame
     ) -> float:
         model = self.get_model(**self.suggest_params(trial))
 
@@ -80,7 +84,7 @@ class ModelBaseWrapper:
                 )
         return params
 
-    def mean_params(self, best_params: dict, best_model_name: str) -> dict:
+    def get_mean_params(self, best_params: dict, best_model_name: str) -> dict:
         mean_params = {"model": best_model_name}
 
         if self.int_suggestions:
@@ -100,6 +104,9 @@ class ModelBaseWrapper:
 
         return mean_params
 
+    def render(self, **kwargs) -> str:
+        raise NotImplementedError
+
 
 class DailyMeanModelWrapper(ModelBaseWrapper):
     def __init__(self, int_suggestions: list[IntSuggestions]):
@@ -110,9 +117,6 @@ class DailyMeanModelWrapper(ModelBaseWrapper):
     @staticmethod
     def render(**kwargs) -> str:
         return f"DailyMeanModel({kwargs['window']})"
-
-    def get_best_model(self, best_params, best_model_name) -> dict:
-        return self.mean_params(best_params, best_model_name)
 
 
 class DayOfWeekMeanModelWrapper(ModelBaseWrapper):
@@ -125,13 +129,13 @@ class DayOfWeekMeanModelWrapper(ModelBaseWrapper):
     def render(**kwargs) -> str:
         return f"DOWMeanModel(weekdays: {kwargs['weekdays_window']}, weekends: {kwargs['weekends_window']})"
 
-    def get_best_model(self, best_params, best_model_name) -> dict:
-        return self.mean_params(best_params, best_model_name)
-
 
 class ProphetWrapper(ModelBaseWrapper):
     def __init__(
         self,
+        int_suggestions: list[IntSuggestions] = None,
+        float_suggestions: list[FloatSuggestions] = None,
+        categorical_suggestions: list[CategoricalSuggestions] = None,
         extra_regressors: list[str] = None,
         holidays=None,
         horizon="16 days",
@@ -155,7 +159,13 @@ class ProphetWrapper(ModelBaseWrapper):
             "holidays": self.holidays,
         }
 
-        super().__init__(estimator=Prophet, model_base_params=self.model_params)
+        super().__init__(
+            estimator=Prophet,
+            model_base_params=self.model_params,
+            int_suggestions=int_suggestions,
+            float_suggestions=float_suggestions,
+            categorical_suggestions=categorical_suggestions,
+        )
 
     def _process_model_before_fit(self, model: Prophet) -> Prophet:
         if self.extra_regressors is not None:
@@ -166,19 +176,8 @@ class ProphetWrapper(ModelBaseWrapper):
     def objective(
         self, trial: optuna.Trial, train: pd.DataFrame, cutoffs: pd.DataFrame
     ) -> float:
-        model = self.get_model(
-            # growth=trial.suggest_categorical("growth", ["linear", "flat"]),
-            # n_changepoints=trial.suggest_int("n_changepoints", 2, 50),
-            changepoint_prior_scale=trial.suggest_float(
-                "changepoint_prior_scale", 0.001, 0.5
-            ),
-            seasonality_prior_scale=trial.suggest_int(
-                "seasonality_prior_scale", 20, 150
-            ),
-            seasonality_mode=trial.suggest_categorical(
-                "seasonality_mode", ["additive", "multiplicative"]
-            ),
-        ).fit(train)
+        model = self.get_model(**self.suggest_params(trial))
+        model.fit(train[train["ds"] > train["ds"].max() - pd.Timedelta(self.initial)])
 
         df_cv = cross_validation(
             model,
@@ -199,14 +198,3 @@ class ProphetWrapper(ModelBaseWrapper):
     @staticmethod
     def render(**kwargs) -> str:
         return "ProphetWrapper"
-
-    @staticmethod
-    def get_best_model(best_params, best_model_name) -> dict:
-        mean_params = {
-            "model": best_model_name,
-            "changepoint_prior_scale": np.mean(best_params["changepoint_prior_scale"]),
-            "seasonality_prior_scale": int(
-                np.mean(best_params["seasonality_prior_scale"])
-            ),
-        }
-        return mean_params
