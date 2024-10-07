@@ -5,9 +5,10 @@ import pandas as pd
 import numpy as np
 
 import optuna
+from sklearn.model_selection import TimeSeriesSplit
 
 from storesales.baseline.model_wrappers import ModelBaseWrapper
-from storesales.baseline.utils import rmsle
+from storesales.baseline.loss import rmsle
 
 
 class SalesPredictor:
@@ -16,10 +17,19 @@ class SalesPredictor:
         model_wrappers: dict[str, ModelBaseWrapper],
         inner_cutoffs: list[int],
         family_groups: list[set[str]],
+        outer_cv: TimeSeriesSplit,
+        optuna_optimize_kwargs: dict,
+        n_group_store_family_choices: int = 4,
+        n_single_store_family_choices: int = 2,
     ):
         self.model_wrappers = model_wrappers
         self.inner_cutoffs = inner_cutoffs
         self.family_groups = family_groups
+
+        self.optuna_optimize_kwargs = optuna_optimize_kwargs
+        self.n_group_store_family_choices = n_group_store_family_choices
+        self.n_single_store_family_choices = n_single_store_family_choices
+        self.outer_cv = outer_cv
 
         self.tune_storage = self._initiate_tune_storage()
         self.best_storage = {}
@@ -32,7 +42,12 @@ class SalesPredictor:
             tune_storage[family_group] = defaultdict(list)
         return tune_storage
 
-    def fit(self, train: pd.DataFrame) -> None:
+    def get_n_store_family_choices(self, family_group):
+        if len(family_group) == 1:
+            return self.n_single_store_family_choices
+        return self.n_group_store_family_choices
+
+    def fit(self, train: pd.DataFrame, initial: str) -> None:
         if not self.best_storage:
             raise ValueError("Sales Predictor has not been tuned.")
 
@@ -43,9 +58,7 @@ class SalesPredictor:
                 model = self.get_best_model(args["params"])
                 self.models[(store_nbr, family)] = model
 
-        last_730_days = train[
-            train["ds"] >= train["ds"].max() - pd.DateOffset(days=730)
-        ]
+        last_730_days = train[train["ds"] >= train["ds"].max() - pd.Timedelta(initial)]
         for (store_nbr, family), model in tqdm(self.models.items()):
             x_train = last_730_days[
                 (last_730_days["store_nbr"] == store_nbr)
@@ -100,9 +113,9 @@ class SalesPredictor:
         loss = np.mean(tune_run["loss"])
 
         values, counts = np.unique(tune_run["model"], return_counts=True)
-        best_model = values[np.argmax(counts)]
+        best_model = str(values[np.argmax(counts)])
 
-        best_params = self.model_wrappers[best_model].get_best_model(
+        best_params = self.model_wrappers[best_model].get_mean_params(
             tune_run, best_model
         )
 
@@ -116,7 +129,7 @@ class SalesPredictor:
         cutoffs = train["ds"].iloc[self.inner_cutoffs].reset_index(drop=True)
         return self.model_wrappers[model_name].objective(trial, train, cutoffs)
 
-    def get_best_model(self, best_params) -> ModelBaseWrapper:
+    def get_best_model(self, best_params):
         best_params = best_params.copy()
         model_name = best_params.pop("model")
         return self.model_wrappers[model_name].get_model(**best_params)
@@ -126,7 +139,7 @@ class SalesPredictor:
 
     def get_best(self, best_model_name: str, run_storage) -> dict:
         best_params = run_storage[best_model_name]
-        mean_params = self.model_wrappers[best_model_name].get_best_model(
+        mean_params = self.model_wrappers[best_model_name].get_mean_params(
             best_params, best_model_name
         )
         return mean_params
