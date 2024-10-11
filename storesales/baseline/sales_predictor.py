@@ -8,13 +8,13 @@ import optuna
 from sklearn.model_selection import TimeSeriesSplit
 
 from storesales.baseline.model_wrappers import ModelBaseWrapper
-from storesales.baseline.loss import rmsle
 
 
 class SalesPredictor:
     def __init__(
         self,
         model_wrappers: dict[str, ModelBaseWrapper],
+        outer_cutoffs: list[pd.Timestamp],
         inner_cutoffs: list[int],
         family_groups: list[tuple[str]],
         outer_cv: TimeSeriesSplit,
@@ -25,6 +25,7 @@ class SalesPredictor:
     ):
         self.model_wrappers = model_wrappers
         self.inner_cutoffs = inner_cutoffs
+        self.outer_cutoffs = outer_cutoffs
         self.family_groups = family_groups
         self.outer_cv = outer_cv
         self.optuna_optimize_kwargs = optuna_optimize_kwargs
@@ -35,9 +36,22 @@ class SalesPredictor:
         self.tune_storage = self._initialize_tune_storage()
         self.family_to_madel_params_storage = {}
         self.store_family_to_model_storage = {}
+        self.tune_loss_storage = self._initialize_tune_loss_storage()
 
     def _initialize_tune_storage(self) -> dict:
         return {family_group: defaultdict(list) for family_group in self.family_groups}
+
+    def _initialize_tune_loss_storage(self) -> dict:
+        return {
+            family_group: {
+                "sample_losses": defaultdict(list),
+                "fold_losses": defaultdict(list),
+            }
+            for family_group in self.family_groups}
+
+    def update_tune_loss_storage(self, family_group: tuple[str], loss: list[float], i_sample: int, i_fold: int) -> None:
+        self.tune_loss_storage[family_group]["sample_losses"][i_sample] += loss
+        self.tune_loss_storage[family_group]["fold_losses"][i_fold] += loss
 
     def get_n_store_family_choices(self, family_group: tuple[str]) -> int:
         if len(family_group) == 1:
@@ -56,6 +70,7 @@ class SalesPredictor:
                 self.store_family_to_model_storage[(store_nbr, family)] = model
 
         train_slice = train[train["ds"] >= train["ds"].max() - pd.Timedelta(initial)]
+
         for (store_nbr, family), model in tqdm(
             self.store_family_to_model_storage.items()
         ):
@@ -63,6 +78,7 @@ class SalesPredictor:
                 (train_slice["store_nbr"] == store_nbr)
                 & (train_slice["family"] == family)
             ]
+            x_train.sort_values(by="ds", inplace=True)
             model.fit(x_train)
 
     def predict(self, test: pd.DataFrame, submission: pd.DataFrame) -> pd.DataFrame:
@@ -90,26 +106,17 @@ class SalesPredictor:
 
         return submission
 
-    def evaluate_and_save_tune(
+    def log_study(
         self,
         family_group: tuple[str],
         best_params: dict,
-        train: pd.DataFrame,
-        test: pd.DataFrame,
-    ) -> float:
-        model = self.get_best_model(best_params)
-        model.fit(train)
-        forecast = model.predict(test)
-        y_pred = forecast["yhat"].values
-        y_true = test["y"].values
-        loss = rmsle(y_true, y_pred)
-
+        loss: float,
+    ) -> None:
         self.tune_storage[family_group]["loss"].append(loss)
         for key, value in best_params.items():
             self.tune_storage[family_group][key].append(value)
-        return loss
 
-    def log_best(self, family_group: tuple[str]):
+    def calc_and_log_mean_params(self, family_group: tuple[str]):
         best_params = self.tune_storage[family_group]
         loss = np.mean(best_params["loss"])
 
