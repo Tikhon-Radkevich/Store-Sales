@@ -26,20 +26,22 @@ def make_time_series_split(
 ):
     families = df["family"].unique()
     stores = df["store_nbr"].unique()
+    total_pairs = len(families) * len(stores)
     dataset = {
         "train": defaultdict(list),
         "test": defaultdict(list),
     }
     test_period = pd.Timedelta(days=test_size)
 
-    for family, store in tqdm(product(families, stores)):
+    for family, store in tqdm(product(families, stores), total=total_pairs):
         store_family_df = df[(df["family"] == family) & (df["store_nbr"] == store)]
 
         for cutoff in cutoffs:
-            train_data = store_family_df[store_family_df["ds"] < cutoff]
-            test_data = store_family_df[
-                (store_family_df["ds"] >= cutoff) & (store_family_df["ds"] < cutoff + test_period)
-                ]
+            start_test = cutoff.strftime("%Y-%m-%d")
+            end_test = (cutoff + test_period).strftime("%Y-%m-%d")
+
+            train_data = store_family_df.query(f" ds < '{start_test}' ")
+            test_data = store_family_df.query(f" '{start_test}' <= ds < '{end_test}' ")
 
             dataset["train"][(store, family)].append(train_data)
             dataset["test"][(store, family)].append(test_data)
@@ -47,20 +49,19 @@ def make_time_series_split(
     return dataset
 
 
-def run_study(df: pd.DataFrame, predictor: SalesPredictor, test_size: int = 16):
+def run_study(df: pd.DataFrame, dataset, predictor: SalesPredictor):
     stores = df["store_nbr"].unique()
-    dataset = make_time_series_split(df, predictor.outer_cutoffs, test_size)
 
     for family_group in predictor.family_groups:
         store_family_groups = list(product(stores, family_group))
         n_choices = predictor.get_n_store_family_choices(family_group)
 
-        for store, family in random.sample(store_family_groups, n_choices):
+        sampled_store_family = random.sample(store_family_groups, n_choices)
+        for i_sample, (store, family) in enumerate(sampled_store_family):
             print(f"\n\nFamily: {family} - Store: {store}")
 
-            outer_results = []
+            outer_rmsle = []
             for i_fold, outer_train in enumerate(dataset["train"][(store, family)]):
-
                 study = optuna.create_study(direction="minimize")
                 study.optimize(
                     lambda trial: predictor.objective(trial, outer_train),
@@ -69,33 +70,40 @@ def run_study(df: pd.DataFrame, predictor: SalesPredictor, test_size: int = 16):
 
                 test_loss = []
                 for _store, _family in store_family_groups:
-                    outer_test = dataset["test"][(_store, _family)][i_fold]
+                    _outer_test = dataset["test"][(_store, _family)][i_fold]
+                    _outer_train = dataset["train"][(_store, _family)][i_fold]
+
                     model = predictor.get_best_model(study.best_params)
-                    model.fit(outer_train)
-                    forecast = model.predict(outer_test)
+                    model.fit(_outer_train)
+                    forecast = model.predict(_outer_test)
                     y_pred = forecast["yhat"].values
-                    y_true = outer_test["y"].values
+                    y_true = _outer_test["y"].values
                     loss = rmsle(y_true, y_pred)
                     test_loss.append(loss)
+
+                predictor.update_tune_loss_storage(family_group, test_loss, i_sample, i_fold)
+
                 fold_test_loss = np.mean(test_loss)
 
-                predictor.evaluate_and_save_tune(
+                predictor.log_study(
                     family_group=family_group,
                     best_params=study.best_params,
-                    loss=fold_test_loss
-                    # train=outer_train.copy(),
-                    # test=outer_test.copy(),
+                    loss=fold_test_loss,
                 )
-                outer_results.append(fold_test_loss)
+                outer_rmsle.append(fold_test_loss)
                 print(
                     f"Outer: {predictor.render_model(study.best_params)} - RMSLE: {fold_test_loss}"
                 )
 
-            final_outer_rmsle = np.mean(outer_results)
-            print(f"\nFamily: {family} - Store: {store} RMSLE: {final_outer_rmsle}")
+            print(f"\nFamily: {family} - Store: {store} RMSLE: {np.mean(outer_rmsle)}")
 
-        predictor.log_best(family_group)
+        predictor.calc_and_log_mean_params(family_group)
 
+    losses = [
+        value["loss"]
+        for _key, value in predictor.family_to_madel_params_storage.items()
+    ]
+    print(f"\n\nTotal RMSLE: {np.mean(losses)}")
     return predictor
 
 
