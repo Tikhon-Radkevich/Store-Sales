@@ -47,9 +47,12 @@ class SalesPredictor:
                 "sample_losses": defaultdict(list),
                 "fold_losses": defaultdict(list),
             }
-            for family_group in self.family_groups}
+            for family_group in self.family_groups
+        }
 
-    def update_tune_loss_storage(self, family_group: tuple[str], loss: list[float], i_sample: int, i_fold: int) -> None:
+    def update_tune_loss_storage(
+        self, family_group: tuple[str], loss: list[float], i_sample: int, i_fold: int
+    ) -> None:
         self.tune_loss_storage[family_group]["sample_losses"][i_sample] += loss
         self.tune_loss_storage[family_group]["fold_losses"][i_fold] += loss
 
@@ -77,7 +80,7 @@ class SalesPredictor:
             x_train = train_slice[
                 (train_slice["store_nbr"] == store_nbr)
                 & (train_slice["family"] == family)
-            ]
+            ].copy()
             x_train.sort_values(by="ds", inplace=True)
             model.fit(x_train)
 

@@ -24,24 +24,21 @@ def make_time_series_split(
     cutoffs: list[pd.Timestamp],
     test_size: int = 16,
 ):
-    families = df["family"].unique()
-    stores = df["store_nbr"].unique()
-    total_pairs = len(families) * len(stores)
     dataset = {
         "train": defaultdict(list),
         "test": defaultdict(list),
     }
     test_period = pd.Timedelta(days=test_size)
+    end_test_cutoffs = [cutoff + test_period for cutoff in cutoffs]
 
-    for family, store in tqdm(product(families, stores), total=total_pairs):
-        store_family_df = df[(df["family"] == family) & (df["store_nbr"] == store)]
+    family_to_store_grouped = df.groupby(["family", "store_nbr"])
+    for (family, store), group in tqdm(family_to_store_grouped):
+        for start_test, end_test in zip(cutoffs, end_test_cutoffs):
+            train_mask = group["ds"] < start_test
+            test_mask = (group["ds"] >= start_test) & (group["ds"] < end_test)
 
-        for cutoff in cutoffs:
-            start_test = cutoff.strftime("%Y-%m-%d")
-            end_test = (cutoff + test_period).strftime("%Y-%m-%d")
-
-            train_data = store_family_df.query(f" ds < '{start_test}' ")
-            test_data = store_family_df.query(f" '{start_test}' <= ds < '{end_test}' ")
+            train_data = group[train_mask]
+            test_data = group[test_mask]
 
             dataset["train"][(store, family)].append(train_data)
             dataset["test"][(store, family)].append(test_data)
@@ -49,18 +46,23 @@ def make_time_series_split(
     return dataset
 
 
-def run_study(df: pd.DataFrame, dataset, predictor: SalesPredictor):
-    stores = df["store_nbr"].unique()
+def run_study(
+    stores: np.ndarray, dataset, predictor: SalesPredictor, optuna_log_off=True
+):
+    if optuna_log_off:
+        optuna.logging.set_verbosity(optuna.logging.ERROR)
 
     for family_group in predictor.family_groups:
+        print(f"Family Group: {family_group}:")
+
         store_family_groups = list(product(stores, family_group))
         n_choices = predictor.get_n_store_family_choices(family_group)
 
         sampled_store_family = random.sample(store_family_groups, n_choices)
-        for i_sample, (store, family) in enumerate(sampled_store_family):
-            print(f"\n\nFamily: {family} - Store: {store}")
-
-            outer_rmsle = []
+        family_group_loss = []
+        for i_sample, (store, family) in tqdm(
+            enumerate(sampled_store_family), total=n_choices
+        ):
             for i_fold, outer_train in enumerate(dataset["train"][(store, family)]):
                 study = optuna.create_study(direction="minimize")
                 study.optimize(
@@ -81,29 +83,26 @@ def run_study(df: pd.DataFrame, dataset, predictor: SalesPredictor):
                     loss = rmsle(y_true, y_pred)
                     test_loss.append(loss)
 
-                predictor.update_tune_loss_storage(family_group, test_loss, i_sample, i_fold)
+                predictor.update_tune_loss_storage(
+                    family_group, test_loss, i_sample, i_fold
+                )
 
                 fold_test_loss = np.mean(test_loss)
+                family_group_loss.append(fold_test_loss)
 
                 predictor.log_study(
                     family_group=family_group,
                     best_params=study.best_params,
                     loss=fold_test_loss,
                 )
-                outer_rmsle.append(fold_test_loss)
-                print(
-                    f"Outer: {predictor.render_model(study.best_params)} - RMSLE: {fold_test_loss}"
-                )
-
-            print(f"\nFamily: {family} - Store: {store} RMSLE: {np.mean(outer_rmsle)}")
-
         predictor.calc_and_log_mean_params(family_group)
+        print(f"RMSLE: {np.mean(family_group_loss)}")
 
     losses = [
         value["loss"]
         for _key, value in predictor.family_to_madel_params_storage.items()
     ]
-    print(f"\n\nTotal RMSLE: {np.mean(losses)}")
+    print(f"\n\nTotal RMSLE: {np.mean(losses)} \n")
     return predictor
 
 

@@ -39,17 +39,19 @@ class ModelBaseWrapper:
     ) -> float:
         model = self.get_model(**self.suggest_params(trial))
         losses = []
+        valid_end_cutoffs = cutoffs + pd.Timedelta(horizon)
 
-        for cutoff in cutoffs:
-            train_data = df[df["ds"] < cutoff]
-            future_data = df[
-                (df["ds"] >= cutoff) & (df["ds"] < cutoff + pd.Timedelta(horizon))
-            ]
+        for valid_start, valid_end in zip(cutoffs, valid_end_cutoffs):
+            train_mask = df["ds"] < valid_start
+            valid_mask = (df["ds"] >= valid_start) & (df["ds"] < valid_end)
+
+            train_data = df[train_mask]
+            valid_data = df[valid_mask]
 
             model.fit(train_data)
-            forecast = model.predict(future_data)
+            forecast = model.predict(valid_data)
 
-            y_true = future_data["y"].values
+            y_true = valid_data["y"].values
             y_pred = forecast["yhat"].values
             losses.append(rmsle(y_true, y_pred))
 

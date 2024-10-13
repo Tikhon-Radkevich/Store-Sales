@@ -1,3 +1,6 @@
+import numpy as np
+
+
 FAMILY_GROUPS = [
     ("AUTOMOTIVE", "CLEANING", "DELI", "GROCERY I", "PERSONAL CARE", "PREPARED FOODS"),
     ("BEAUTY", "BEVERAGES", "BREAD/BAKERY", "DAIRY", "EGGS", "POULTRY"),
@@ -27,3 +30,4 @@ FAMILY_GROUPS = [
 ]
 
 N_STORES = 54
+STORES = np.arange(1, N_STORES + 1)
