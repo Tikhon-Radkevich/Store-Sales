@@ -1,6 +1,5 @@
-from collections import defaultdict
-from itertools import product
 import random
+from collections import defaultdict
 
 from tqdm import tqdm
 import numpy as np
@@ -37,8 +36,8 @@ def make_time_series_split(
             train_mask = group["ds"] < start_test
             test_mask = (group["ds"] >= start_test) & (group["ds"] < end_test)
 
-            train_data = group[train_mask]
-            test_data = group[test_mask]
+            train_data = group[train_mask].copy()
+            test_data = group[test_mask].copy()
 
             dataset["train"][(store, family)].append(train_data)
             dataset["test"][(store, family)].append(test_data)
@@ -46,24 +45,24 @@ def make_time_series_split(
     return dataset
 
 
-def run_study(
-    stores: np.ndarray, dataset, predictor: SalesPredictor, optuna_log_off=True
-):
+def run_study(dataset, predictor: SalesPredictor, optuna_log_off=True):
     if optuna_log_off:
         optuna.logging.set_verbosity(optuna.logging.ERROR)
 
     for family_group in predictor.family_groups:
         print(f"Family Group: {family_group}:")
 
-        store_family_groups = list(product(stores, family_group))
         n_choices = predictor.get_n_store_family_choices(family_group)
 
-        sampled_store_family = random.sample(store_family_groups, n_choices)
+        store_family_pairs = predictor.store_family_pairs[family_group]
+        sampled_store_family = random.sample(store_family_pairs, n_choices)
+
         family_group_loss = []
         for i_sample, (store, family) in tqdm(
             enumerate(sampled_store_family), total=n_choices
         ):
             for i_fold, outer_train in enumerate(dataset["train"][(store, family)]):
+                print(i_fold)
                 study = optuna.create_study(direction="minimize")
                 study.optimize(
                     lambda trial: predictor.objective(trial, outer_train),
@@ -71,7 +70,7 @@ def run_study(
                 )
 
                 test_loss = []
-                for _store, _family in store_family_groups:
+                for _store, _family in store_family_pairs:
                     _outer_test = dataset["test"][(_store, _family)][i_fold]
                     _outer_train = dataset["train"][(_store, _family)][i_fold]
 
@@ -82,6 +81,7 @@ def run_study(
                     y_true = _outer_test["y"].values
                     loss = rmsle(y_true, y_pred)
                     test_loss.append(loss)
+                    predictor.store_family_loss_storage[(_store, _family)].append(loss)
 
                 predictor.update_tune_loss_storage(
                     family_group, test_loss, i_sample, i_fold
