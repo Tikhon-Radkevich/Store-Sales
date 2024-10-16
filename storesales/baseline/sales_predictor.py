@@ -1,11 +1,11 @@
+from itertools import product
 from collections import defaultdict
-from tqdm import tqdm
 
+from tqdm import tqdm
 import pandas as pd
 import numpy as np
 
 import optuna
-from sklearn.model_selection import TimeSeriesSplit
 
 from storesales.baseline.model_wrappers import ModelBaseWrapper
 
@@ -17,8 +17,8 @@ class SalesPredictor:
         outer_cutoffs: list[pd.Timestamp],
         inner_cutoffs: list[int],
         family_groups: list[tuple[str]],
-        outer_cv: TimeSeriesSplit,
         optuna_optimize_kwargs: dict,
+        family_group_to_stores: dict,
         n_group_store_family_choices: int = 4,
         n_single_store_family_choices: int = 2,
         horizon: str = "16 days",
@@ -27,16 +27,25 @@ class SalesPredictor:
         self.inner_cutoffs = inner_cutoffs
         self.outer_cutoffs = outer_cutoffs
         self.family_groups = family_groups
-        self.outer_cv = outer_cv
+        # self.outer_cv = outer_cv
         self.optuna_optimize_kwargs = optuna_optimize_kwargs
+        self.family_group_to_stores = family_group_to_stores
         self.n_group_store_family_choices = n_group_store_family_choices
         self.n_single_store_family_choices = n_single_store_family_choices
         self.horizon = horizon
 
         self.tune_storage = self._initialize_tune_storage()
+        self.store_family_pairs = self._initialize_store_family_pairs()
         self.family_to_madel_params_storage = {}
         self.store_family_to_model_storage = {}
+        self.store_family_loss_storage = defaultdict(list)
         self.tune_loss_storage = self._initialize_tune_loss_storage()
+
+    def _initialize_store_family_pairs(self):
+        store_family_pairs = {}
+        for family_group, stores in self.family_group_to_stores.items():
+            store_family_pairs[family_group] = list(product(stores, family_group))
+        return store_family_pairs
 
     def _initialize_tune_storage(self) -> dict:
         return {family_group: defaultdict(list) for family_group in self.family_groups}
