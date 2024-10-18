@@ -8,6 +8,8 @@ class DailyMeanModel:
 
     def fit(self, train: pd.DataFrame) -> None:
         self.mean_prediction = train["y"].tail(self.window).mean()
+        if pd.isna(self.mean_prediction):
+            self.mean_prediction = 0
 
     def predict(self, future: pd.DataFrame) -> pd.DataFrame:
         if self.mean_prediction is None:
@@ -30,6 +32,11 @@ class DayOfWeekMeanModel:
             "weekdays": weekdays_data["y"].tail(self.weekdays_window).mean(),
             "weekends": weekends_data["y"].tail(self.weekends_window).mean(),
         }
+
+        if pd.isna(self.mean_predictions["weekdays"]):
+            self.mean_predictions["weekdays"] = 0
+        if pd.isna(self.mean_predictions["weekends"]):
+            self.mean_predictions["weekends"] = 0
 
     def predict(self, future: pd.DataFrame) -> pd.DataFrame:
         if self.mean_predictions is None:
@@ -63,10 +70,15 @@ class WeightedDayMeanModel:
         self.train = None
 
     def fit(self, train: pd.DataFrame) -> None:
-        self.train = train.copy()
+        self.train = train.set_index("ds")
 
-    def _get_day_averages(self, date: pd.Timestamp):
-        # Get past data for the same day of the week, month, and year ago
+    def _get_past_averages(self, dates: list[pd.Timestamp]) -> float:
+        # Averages for weeks, months, years ago
+        past_data = self.train.loc[self.train.index.isin(dates), "y"]
+        return past_data.mean() if not past_data.empty else 0.0
+
+    def _get_day_averages(self, date: pd.Timestamp) -> tuple[float, float, float]:
+        # Precompute past dates based on windows
         week_ago_dates = [
             date - pd.DateOffset(weeks=i) for i in range(1, self.weeks_window + 1)
         ]
@@ -77,20 +89,20 @@ class WeightedDayMeanModel:
             date - pd.DateOffset(years=i) for i in range(1, self.years_window + 1)
         ]
 
-        week_ago_data = self.train[self.train["ds"].isin(week_ago_dates)]["y"].mean()
-        month_ago_data = self.train[self.train["ds"].isin(month_ago_dates)]["y"].mean()
-        year_ago_data = self.train[self.train["ds"].isin(year_ago_dates)]["y"].mean()
+        week_avg = self._get_past_averages(week_ago_dates)
+        month_avg = self._get_past_averages(month_ago_dates)
+        year_avg = self._get_past_averages(year_ago_dates)
 
-        return week_ago_data, month_ago_data, year_ago_data
+        return week_avg, month_avg, year_avg
 
     def predict(self, future: pd.DataFrame) -> pd.DataFrame:
         if self.train is None:
             raise ValueError("Model not fitted yet.")
 
-        future_predictions = future.copy()
+        future = future.copy()
 
         yhat_values = []
-        for future_date in future_predictions["ds"]:
+        for future_date in future["ds"]:
             week_avg, month_avg, year_avg = self._get_day_averages(future_date)
 
             yhat = (
@@ -100,11 +112,12 @@ class WeightedDayMeanModel:
             )
             yhat_values.append(yhat)
 
-            # update train to use prediction for future predictions
-            self.train = pd.concat(
-                [self.train, pd.DataFrame({"ds": [future_date], "y": [yhat]})],
-                ignore_index=True,
-            )
+            # # update train to use prediction for future predictions
+            # # commented to speed up the
+            # self.train = pd.concat(
+            #     [self.train, pd.DataFrame({"ds": [future_date], "y": [yhat]})],
+            #     ignore_index=True,
+            # )
 
-        future_predictions["yhat"] = yhat_values
-        return future_predictions
+        future["yhat"] = yhat_values
+        return future
