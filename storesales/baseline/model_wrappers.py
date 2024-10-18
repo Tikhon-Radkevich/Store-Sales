@@ -5,7 +5,11 @@ import optuna
 from prophet import Prophet
 from prophet.diagnostics import cross_validation
 
-from storesales.baseline.stat_models import DailyMeanModel, DayOfWeekMeanModel
+from storesales.baseline.stat_models import (
+    DailyMeanModel,
+    DayOfWeekMeanModel,
+    WeightedDayMeanModel,
+)
 from storesales.baseline.param_suggestions import (
     IntSuggestions,
     FloatSuggestions,
@@ -51,7 +55,7 @@ class ModelBaseWrapper:
             model.fit(train_data)
             forecast = model.predict(valid_data)
 
-            y_true = valid_data["y"].values
+            y_true = forecast["y"].values
             y_pred = forecast["yhat"].values
             losses.append(rmsle(y_true, y_pred))
 
@@ -115,6 +119,29 @@ class DayOfWeekMeanModelWrapper(ModelBaseWrapper):
     @staticmethod
     def render(**kwargs) -> str:
         return f"DOWMeanModel(weekdays={kwargs['weekdays_window']}, weekends={kwargs['weekends_window']})"
+
+
+class WeightedDayMeanModelWrapper(ModelBaseWrapper):
+    def __init__(
+        self,
+        int_suggestions: list[IntSuggestions],
+        float_suggestions: list[FloatSuggestions],
+    ):
+        super().__init__(
+            estimator=WeightedDayMeanModel,
+            int_suggestions=int_suggestions,
+            float_suggestions=float_suggestions,
+        )
+
+    @staticmethod
+    def render(**kwargs) -> str:
+        windows = (
+            kwargs["weeks_window"],
+            kwargs["months_window"],
+            kwargs["years_window"],
+        )
+        weights = (kwargs["week_weight"], kwargs["month_weight"], kwargs["year_weight"])
+        return f"WeightedDayMeanModel(w/m/y: win={windows}, weigh={weights})"
 
 
 class ProphetWrapper(ModelBaseWrapper):
