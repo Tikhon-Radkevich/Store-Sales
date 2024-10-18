@@ -21,17 +21,18 @@ class SalesPredictor:
         family_group_to_stores: dict,
         n_group_store_family_choices: int = 4,
         n_single_store_family_choices: int = 2,
+        initial: str = "760 days",
         horizon: str = "16 days",
     ):
         self.model_wrappers = model_wrappers
         self.inner_cutoffs = inner_cutoffs
         self.outer_cutoffs = outer_cutoffs
         self.family_groups = family_groups
-        # self.outer_cv = outer_cv
         self.optuna_optimize_kwargs = optuna_optimize_kwargs
         self.family_group_to_stores = family_group_to_stores
         self.n_group_store_family_choices = n_group_store_family_choices
         self.n_single_store_family_choices = n_single_store_family_choices
+        self.initial = initial
         self.horizon = horizon
 
         self.tune_storage = self._initialize_tune_storage()
@@ -41,23 +42,12 @@ class SalesPredictor:
         self.store_family_loss_storage = defaultdict(list)
         self.tune_loss_storage = self._initialize_tune_loss_storage()
 
-    def _initialize_store_family_pairs(self):
-        store_family_pairs = {}
-        for family_group, stores in self.family_group_to_stores.items():
-            store_family_pairs[family_group] = list(product(stores, family_group))
-        return store_family_pairs
-
-    def _initialize_tune_storage(self) -> dict:
-        return {family_group: defaultdict(list) for family_group in self.family_groups}
-
-    def _initialize_tune_loss_storage(self) -> dict:
-        return {
-            family_group: {
-                "sample_losses": defaultdict(list),
-                "fold_losses": defaultdict(list),
-            }
-            for family_group in self.family_groups
-        }
+    def combine_with_predictor(self, predictor: "SalesPredictor") -> None:
+        # will replace trained model with new ones from `predictor`
+        # self.model_wrappers.update(predictor.model_wrappers)
+        self.store_family_to_model_storage.update(
+            predictor.store_family_to_model_storage
+        )
 
     def update_tune_loss_storage(
         self, family_group: tuple[str], loss: list[float], i_sample: int, i_fold: int
@@ -70,18 +60,18 @@ class SalesPredictor:
             return self.n_single_store_family_choices
         return self.n_group_store_family_choices
 
-    def fit(self, train: pd.DataFrame, initial: str = "760 days") -> None:
+    def fit(self, train: pd.DataFrame) -> None:
         if not self.family_to_madel_params_storage:
             raise ValueError("Sales Predictor has not been tuned.")
 
-        store_nbrs = train["store_nbr"].unique()
-
         for family, model_params in self.family_to_madel_params_storage.items():
-            for store_nbr in store_nbrs:
+            for store_nbr in model_params["stores"]:
                 model = self.get_best_model(model_params["params"])
                 self.store_family_to_model_storage[(store_nbr, family)] = model
 
-        train_slice = train[train["ds"] >= train["ds"].max() - pd.Timedelta(initial)]
+        train_slice = train[
+            train["ds"] >= train["ds"].max() - pd.Timedelta(self.initial)
+        ]
 
         for (store_nbr, family), model in tqdm(
             self.store_family_to_model_storage.items()
@@ -142,6 +132,7 @@ class SalesPredictor:
         for family in family_group:
             self.family_to_madel_params_storage[family] = {
                 "params": best_mean_params,
+                "stores": self.family_group_to_stores[family_group],
                 "loss": loss,
             }
 
@@ -149,7 +140,13 @@ class SalesPredictor:
         model_name = trial.suggest_categorical(
             "model", list(self.model_wrappers.keys())
         )
-        cutoffs = train["ds"].iloc[self.inner_cutoffs].reset_index(drop=True)
+        train_length = len(train)
+        # self.inner_cutoffs are indices of cutoffs in train data.
+        # cutoff can be negative.
+        valid_cutoffs = [
+            i for i in self.inner_cutoffs if -train_length <= i < train_length
+        ]
+        cutoffs = train["ds"].iloc[valid_cutoffs].reset_index(drop=True)
         return self.model_wrappers[model_name].objective(
             trial, train, cutoffs, self.horizon
         )
@@ -161,3 +158,24 @@ class SalesPredictor:
 
     def render_model(self, params) -> str:
         return self.model_wrappers[params["model"]].render(**params)
+
+    def _initialize_store_family_pairs(self):
+        # save all possible store-family pairs for each family group.
+        # will be used to sample store-family pair for tuning.
+        store_family_pairs = {}
+        for family_group, stores in self.family_group_to_stores.items():
+            store_family_pairs[family_group] = list(product(stores, family_group))
+        return store_family_pairs
+
+    def _initialize_tune_storage(self) -> dict:
+        # store best param samples from optuna studies for each family group
+        return {family_group: defaultdict(list) for family_group in self.family_groups}
+
+    def _initialize_tune_loss_storage(self) -> dict:
+        return {
+            family_group: {
+                "sample_losses": defaultdict(list),
+                "fold_losses": defaultdict(list),
+            }
+            for family_group in self.family_groups
+        }
