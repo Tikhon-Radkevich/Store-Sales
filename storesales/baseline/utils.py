@@ -7,6 +7,7 @@ import pandas as pd
 
 import optuna
 
+from storesales.light_gbm.preprocessing import preprocess
 from storesales.baseline.loss import rmsle
 from storesales.baseline.sales_predictor import SalesPredictor
 from storesales.constants import (
@@ -24,8 +25,8 @@ def make_time_series_split(
     test_size: int = 16,
 ):
     dataset = {
-        "train": defaultdict(list),
-        "test": defaultdict(list),
+        "train": defaultdict(dict),
+        "test": defaultdict(dict),
     }
     test_period = pd.Timedelta(days=test_size)
     end_test_cutoffs = [cutoff + test_period for cutoff in cutoffs]
@@ -33,14 +34,17 @@ def make_time_series_split(
     family_to_store_grouped = df.groupby(["family", "store_nbr"])
     for (family, store), group in tqdm(family_to_store_grouped):
         for start_test, end_test in zip(cutoffs, end_test_cutoffs):
+            if start_test <= group["ds"].min():
+                continue
+
             train_mask = group["ds"] < start_test
             test_mask = (group["ds"] >= start_test) & (group["ds"] < end_test)
 
-            train_data = group[train_mask].copy()
-            test_data = group[test_mask].copy()
+            train_data = group[train_mask]
+            test_data = group[test_mask]
 
-            dataset["train"][(store, family)].append(train_data)
-            dataset["test"][(store, family)].append(test_data)
+            dataset["train"][(store, family)][start_test] = train_data
+            dataset["test"][(store, family)][start_test] = test_data
 
     return dataset
 
@@ -55,14 +59,17 @@ def run_study(dataset, predictor: SalesPredictor, optuna_log_off=True):
         n_choices = predictor.get_n_store_family_choices(family_group)
 
         store_family_pairs = predictor.store_family_pairs[family_group]
-        sampled_store_family = random.sample(store_family_pairs, n_choices)
+
+        if len(store_family_pairs) <= n_choices:
+            sampled_store_family = store_family_pairs
+        else:
+            sampled_store_family = random.sample(store_family_pairs, n_choices)
 
         family_group_loss = []
         for i_sample, (store, family) in tqdm(
-            enumerate(sampled_store_family), total=n_choices
+            enumerate(sampled_store_family), total=len(sampled_store_family)
         ):
-            for i_fold, outer_train in enumerate(dataset["train"][(store, family)]):
-                print(i_fold)
+            for start_test, outer_train in dataset["train"][(store, family)].items():
                 study = optuna.create_study(direction="minimize")
                 study.optimize(
                     lambda trial: predictor.objective(trial, outer_train),
@@ -71,8 +78,15 @@ def run_study(dataset, predictor: SalesPredictor, optuna_log_off=True):
 
                 test_loss = []
                 for _store, _family in store_family_pairs:
-                    _outer_test = dataset["test"][(_store, _family)][i_fold]
-                    _outer_train = dataset["train"][(_store, _family)][i_fold]
+                    _outer_test = dataset["test"][(_store, _family)].get(
+                        start_test, None
+                    )
+                    _outer_train = dataset["train"][(_store, _family)].get(
+                        start_test, None
+                    )
+
+                    if _outer_test is None or _outer_train is None:
+                        continue
 
                     model = predictor.get_best_model(study.best_params)
                     model.fit(_outer_train)
@@ -81,10 +95,11 @@ def run_study(dataset, predictor: SalesPredictor, optuna_log_off=True):
                     y_true = _outer_test["y"].values
                     loss = rmsle(y_true, y_pred)
                     test_loss.append(loss)
+                    # print(f"RMSLE: {loss}")
                     predictor.store_family_loss_storage[(_store, _family)].append(loss)
 
                 predictor.update_tune_loss_storage(
-                    family_group, test_loss, i_sample, i_fold
+                    family_group, test_loss, i_sample, start_test
                 )
 
                 fold_test_loss = np.mean(test_loss)
@@ -96,7 +111,7 @@ def run_study(dataset, predictor: SalesPredictor, optuna_log_off=True):
                     loss=fold_test_loss,
                 )
         predictor.calc_and_log_mean_params(family_group)
-        print(f"RMSLE: {np.mean(family_group_loss)}")
+        print(f"RMSLE: {np.mean(family_group_loss)}\n")
 
     losses = [
         value["loss"]
@@ -106,7 +121,7 @@ def run_study(dataset, predictor: SalesPredictor, optuna_log_off=True):
     return predictor
 
 
-def load_baseline_data():
+def load_baseline_data(use_light_gbm_preprocessing=False):
     # load oil
     oil_df = pd.read_csv(EXTERNAL_OIL_PATH, parse_dates=["date"])
     oil_df.set_index("date", inplace=True)
@@ -117,6 +132,9 @@ def load_baseline_data():
     # load train
     original_train_df = pd.read_csv(EXTERNAL_TRAIN_PATH, parse_dates=["date"])
     original_train_df.sort_values(by=["date", "store_nbr", "family"], inplace=True)
+
+    if use_light_gbm_preprocessing:
+        original_train_df = preprocess(original_train_df)
 
     train_df = original_train_df[["date", "sales", "store_nbr", "family"]].copy()
     train_df.rename(columns={"date": "ds", "sales": "y"}, inplace=True)
