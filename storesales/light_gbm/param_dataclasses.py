@@ -1,0 +1,44 @@
+from dataclasses import dataclass
+
+import pandas as pd
+
+from tsfresh.feature_extraction import MinimalFCParameters
+from tsfresh.utilities.dataframe_functions import impute
+
+
+@dataclass
+class TrainRollParam:
+    df_or_dict: pd.DataFrame
+    column_id: str = "id"
+    column_sort: str = "time"
+    max_timeshift: int = 30
+    min_timeshift: int = 30
+    rolling_direction: int = 1
+    n_jobs: int = 6
+
+
+@dataclass
+class TargetRollParam:
+    df_or_dict: pd.DataFrame
+    column_id: str = "id"
+    column_sort: str = "time"
+    max_timeshift: int = 15
+    min_timeshift: int = 15
+    rolling_direction: int = -1
+    n_jobs: int = 6
+
+
+@dataclass
+class ExtractFeaturesParam:
+    default_fc_parameters = dict(MinimalFCParameters())
+    column_id: str = "id"
+    column_sort: str = "time"
+    impute_function = impute
+    n_jobs: int = 6
+
+
+@dataclass
+class InitDataLoaderParam:
+    train_roll_param: TrainRollParam
+    target_roll_param: TargetRollParam
+    extract_features_param: ExtractFeaturesParam
