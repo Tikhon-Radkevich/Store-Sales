@@ -2,12 +2,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from storesales.light_gbm.tsfresh_processor import extract_features, roll_time_series
 
-from storesales.light_gbm.param_dataclasses import (
-    ExtractFeaturesParam,
-    InitDataLoaderParam,
-    TargetRollParam,
-    TrainRollParam,
-)
+from storesales.light_gbm.param_dataclasses import InitDataLoaderParam
 
 
 class DataLoader:
