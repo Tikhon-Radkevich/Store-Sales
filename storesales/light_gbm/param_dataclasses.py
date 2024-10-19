@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from tsfresh.feature_extraction import MinimalFCParameters
+from tsfresh.feature_extraction import MinimalFCParameters, ComprehensiveFCParameters
 from tsfresh.utilities.dataframe_functions import impute
 
 
@@ -30,10 +30,10 @@ class TargetRollParam:
 
 @dataclass
 class ExtractFeaturesParam:
-    default_fc_parameters = dict(MinimalFCParameters())
+    default_fc_parameters: ComprehensiveFCParameters = MinimalFCParameters()
     column_id: str = "id"
     column_sort: str = "time"
-    impute_function = impute
+    impute_function: callable = impute
     n_jobs: int = 6
 
 
