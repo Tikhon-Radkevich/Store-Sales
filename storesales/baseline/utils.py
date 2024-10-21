@@ -115,7 +115,7 @@ def run_study(dataset, predictor: SalesPredictor, optuna_log_off=True):
 
     losses = [
         value["loss"]
-        for _key, value in predictor.family_to_madel_params_storage.items()
+        for _key, value in predictor.family_to_model_params_storage.items()
     ]
     print(f"\n\nTotal RMSLE: {np.mean(losses)} \n")
     return predictor

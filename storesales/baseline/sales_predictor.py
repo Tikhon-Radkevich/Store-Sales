@@ -37,7 +37,7 @@ class SalesPredictor:
 
         self.tune_storage = self._initialize_tune_storage()
         self.store_family_pairs = self._initialize_store_family_pairs()
-        self.family_to_madel_params_storage = {}
+        self.family_to_model_params_storage = {}
         self.store_family_to_model_storage = {}
         self.store_family_loss_storage = defaultdict(list)
         self.tune_loss_storage = self._initialize_tune_loss_storage()
@@ -61,10 +61,10 @@ class SalesPredictor:
         return self.n_group_store_family_choices
 
     def fit(self, train: pd.DataFrame) -> None:
-        if not self.family_to_madel_params_storage:
+        if not self.family_to_model_params_storage:
             raise ValueError("Sales Predictor has not been tuned.")
 
-        for family, model_params in self.family_to_madel_params_storage.items():
+        for family, model_params in self.family_to_model_params_storage.items():
             for store_nbr in model_params["stores"]:
                 model = self.get_best_model(model_params["params"])
                 self.store_family_to_model_storage[(store_nbr, family)] = model
@@ -130,7 +130,7 @@ class SalesPredictor:
         )
 
         for family in family_group:
-            self.family_to_madel_params_storage[family] = {
+            self.family_to_model_params_storage[family] = {
                 "params": best_mean_params,
                 "stores": self.family_group_to_stores[family_group],
                 "loss": loss,
