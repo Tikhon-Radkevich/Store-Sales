@@ -42,6 +42,8 @@ class SalesPredictor:
         self.store_family_loss_storage = defaultdict(list)
         self.tune_loss_storage = self._initialize_tune_loss_storage()
 
+    def evaluate(self, test_dataset): ...
+
     def combine_with_predictor(self, predictor: "SalesPredictor") -> None:
         # will replace trained model with new ones from `predictor`
         # self.model_wrappers.update(predictor.model_wrappers)
@@ -60,46 +62,45 @@ class SalesPredictor:
             return self.n_single_store_family_choices
         return self.n_group_store_family_choices
 
-    def fit(self, train: pd.DataFrame) -> None:
+    def fit(self, train: pd.DataFrame, disable_tqdm: bool = False) -> None:
         if not self.family_to_model_params_storage:
             raise ValueError("Sales Predictor has not been tuned.")
 
-        for family, model_params in self.family_to_model_params_storage.items():
-            for store_nbr in model_params["stores"]:
-                model = self.get_best_model(model_params["params"])
-                self.store_family_to_model_storage[(store_nbr, family)] = model
+        if self.store_family_to_model_storage == {}:
+            for family, model_params in self.family_to_model_params_storage.items():
+                for store_nbr in model_params["stores"]:
+                    model = self.get_best_model(model_params["params"])
+                    self.store_family_to_model_storage[(store_nbr, family)] = model
 
-        train_slice = train[
-            train["ds"] >= train["ds"].max() - pd.Timedelta(self.initial)
-        ]
+        if self.initial is not None:
+            train_slice = train[
+                train["ds"] >= train["ds"].max() - pd.Timedelta(self.initial)
+            ]
+        else:
+            train_slice = train
 
-        for (store_nbr, family), model in tqdm(
-            self.store_family_to_model_storage.items()
-        ):
-            x_train = train_slice[
-                (train_slice["store_nbr"] == store_nbr)
-                & (train_slice["family"] == family)
-            ].copy()
-            x_train.sort_values(by="ds", inplace=True)
-            model.fit(x_train)
+        x_train_groups = train_slice.groupby(["store_nbr", "family"])
+        for (store_nbr, family), x_group in tqdm(x_train_groups, disable=disable_tqdm):
+            model = self.store_family_to_model_storage[(store_nbr, family)]
+            x_group.sort_values(by="ds", inplace=True)
+            model.fit(x_group)
 
     def predict(self, test: pd.DataFrame, submission: pd.DataFrame) -> pd.DataFrame:
         prediction_list = []
 
-        for (store_nbr, family), model in tqdm(
-            self.store_family_to_model_storage.items()
-        ):
-            x_test = test[(test["store_nbr"] == store_nbr) & (test["family"] == family)]
+        x_test_groups = test.groupby(["store_nbr", "family"])
+        for (store_nbr, family), group in tqdm(x_test_groups):
+            model = self.store_family_to_model_storage[(store_nbr, family)]
 
-            forecast = model.predict(x_test)[["ds", "yhat"]]
+            forecast = model.predict(group)[["ds", "yhat"]]
 
             forecast["store_nbr"] = store_nbr
             forecast["family"] = family
 
-            x_test = x_test.merge(
+            prediction = group.merge(
                 forecast, on=["store_nbr", "family", "ds"], how="left"
             )
-            prediction_list.append(x_test)
+            prediction_list.append(prediction)
 
         predictions = pd.concat(prediction_list, ignore_index=True)
 
