@@ -136,7 +136,6 @@ def run_study(dataset, predictor: SalesPredictor, optuna_log_off=True):
                     y_true = _outer_test["y"].values
                     loss = rmsle(y_true, y_pred)
                     test_loss.append(loss)
-                    # print(f"RMSLE: {loss}")
                     predictor.store_family_loss_storage[(_store, _family)].append(loss)
 
                 predictor.update_tune_loss_storage(
