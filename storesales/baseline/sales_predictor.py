@@ -21,7 +21,7 @@ class SalesPredictor:
         family_group_to_stores: dict,
         n_group_store_family_choices: int = 4,
         n_single_store_family_choices: int = 2,
-        initial: str = "760 days",
+        initial: str | None = "760 days",
         horizon: str = "16 days",
     ):
         self.model_wrappers = model_wrappers
@@ -85,29 +85,18 @@ class SalesPredictor:
             x_group.sort_values(by="ds", inplace=True)
             model.fit(x_group)
 
-    def predict(self, test: pd.DataFrame, submission: pd.DataFrame) -> pd.DataFrame:
+    def predict(self, test: pd.DataFrame, disable_tqdm: bool = False) -> pd.DataFrame:
         prediction_list = []
 
         x_test_groups = test.groupby(["store_nbr", "family"])
-        for (store_nbr, family), group in tqdm(x_test_groups):
+        for (store_nbr, family), group in tqdm(x_test_groups, disable=disable_tqdm):
             model = self.store_family_to_model_storage[(store_nbr, family)]
 
-            forecast = model.predict(group)[["ds", "yhat"]]
-
-            forecast["store_nbr"] = store_nbr
-            forecast["family"] = family
-
-            prediction = group.merge(
-                forecast, on=["store_nbr", "family", "ds"], how="left"
-            )
-            prediction_list.append(prediction)
+            forecast = model.predict(group)
+            prediction_list.append(forecast)
 
         predictions = pd.concat(prediction_list, ignore_index=True)
-
-        predictions.set_index("id", inplace=True)
-        submission["sales"] = predictions["yhat"]
-
-        return submission
+        return predictions
 
     def log_study(
         self,
