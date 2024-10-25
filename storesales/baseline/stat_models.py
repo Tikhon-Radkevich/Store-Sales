@@ -15,7 +15,7 @@ class DailyMeanModel:
         if self.mean_prediction is None:
             raise ValueError("Model not fitted yet.")
         future_predictions = future.copy()
-        future_predictions["yhat"] = [self.mean_prediction] * len(future)
+        future_predictions["yhat"] = self.mean_prediction
         return future_predictions
 
 
@@ -69,8 +69,23 @@ class WeightedDayMeanModel:
         self.year_weight = year_weight
         self.train = None
 
+        self._process_weights()
+
     def fit(self, train: pd.DataFrame) -> None:
         self.train = train.set_index("ds")
+
+    def _process_weights(self):
+        if self.weeks_window == 0:
+            self.week_weight = 0
+        if self.months_window == 0:
+            self.month_weight = 0
+        if self.years_window == 0:
+            self.year_weight = 0
+
+        total_weight = self.week_weight + self.month_weight + self.year_weight
+        self.week_weight /= total_weight
+        self.month_weight /= total_weight
+        self.year_weight /= total_weight
 
     def _get_past_averages(self, dates: list[pd.Timestamp]) -> float:
         # Averages for weeks, months, years ago
@@ -111,13 +126,6 @@ class WeightedDayMeanModel:
                 + (year_avg * self.year_weight)
             )
             yhat_values.append(yhat)
-
-            # # update train to use prediction for future predictions
-            # # commented to speed up the
-            # self.train = pd.concat(
-            #     [self.train, pd.DataFrame({"ds": [future_date], "y": [yhat]})],
-            #     ignore_index=True,
-            # )
 
         future["yhat"] = yhat_values
         return future
