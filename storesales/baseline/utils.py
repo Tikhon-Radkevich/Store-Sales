@@ -1,5 +1,7 @@
+import warnings
 import random
 from collections import defaultdict
+from joblib import Parallel, delayed
 
 from tqdm import tqdm
 import numpy as np
@@ -16,6 +18,7 @@ from storesales.constants import (
     EXTERNAL_TEST_PATH,
     EXTERNAL_OIL_PATH,
     EXTERNAL_HOLIDAYS_EVENTS_PATH,
+    TRAIN_TEST_SPLIT_DATE,
 )
 
 
@@ -24,16 +27,32 @@ def make_time_series_split(
     cutoffs: list[pd.Timestamp],
     test_size: int = 16,
 ):
-    dataset = {
+    # date for train test split
+    train_test_split_date = pd.Timestamp(TRAIN_TEST_SPLIT_DATE)
+
+    # train data for nested cv
+    train_dataset = {
         "train": defaultdict(dict),
         "test": defaultdict(dict),
     }
+
+    # nested cv outer loop test period
     test_period = pd.Timedelta(days=test_size)
     end_test_cutoffs = [cutoff + test_period for cutoff in cutoffs]
+
+    # cutoff warning
+    for start_cutoff, end_cutoff in zip(cutoffs, end_test_cutoffs):
+        if end_cutoff >= train_test_split_date:
+            warnings.warn(
+                f"cutoff ({start_cutoff} + {test_size} days) >= train_test_split_date: {train_test_split_date}."
+                f"Skipping this cutoff."
+            )
 
     family_to_store_grouped = df.groupby(["family", "store_nbr"])
     for (family, store), group in tqdm(family_to_store_grouped):
         for start_test, end_test in zip(cutoffs, end_test_cutoffs):
+            if end_test >= train_test_split_date:
+                continue
             if start_test <= group["ds"].min():
                 continue
 
@@ -43,10 +62,32 @@ def make_time_series_split(
             train_data = group[train_mask]
             test_data = group[test_mask]
 
-            dataset["train"][(store, family)][start_test] = train_data
-            dataset["test"][(store, family)][start_test] = test_data
+            train_dataset["train"][(store, family)][start_test] = train_data
+            train_dataset["test"][(store, family)][start_test] = test_data
 
-    return dataset
+    return train_dataset
+
+
+def calculate_loss_for_date(
+    predictor: SalesPredictor, df: pd.DataFrame, date: pd.Timestamp
+):
+    train = df[df["ds"] < date]
+    test = df[(df["ds"] >= date) & (df["ds"] < date + pd.Timedelta(days=16))]
+
+    predictor.fit(train, disable_tqdm=True)
+    prediction = predictor.predict(test, disable_tqdm=True)
+
+    loss = rmsle(prediction["y"], prediction["yhat"])
+    return loss
+
+
+def evaluate(df: pd.DataFrame, predictor: SalesPredictor, n_jobs: int = -1):
+    series_test_range = pd.date_range(TRAIN_TEST_SPLIT_DATE, df["ds"].max(), freq="D")
+    losses = Parallel(n_jobs=n_jobs)(
+        delayed(calculate_loss_for_date)(predictor, df, date)
+        for date in tqdm(series_test_range)
+    )
+    return np.mean(losses)
 
 
 def run_study(dataset, predictor: SalesPredictor, optuna_log_off=True):
