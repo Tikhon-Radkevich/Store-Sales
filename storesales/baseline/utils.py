@@ -22,14 +22,11 @@ from storesales.constants import (
 )
 
 
-def make_time_series_split(
+def make_time_series_dataset(
     df: pd.DataFrame,
     cutoffs: list[pd.Timestamp],
     test_size: int = 16,
 ):
-    # date for train test split
-    train_test_split_date = pd.Timestamp(TRAIN_TEST_SPLIT_DATE)
-
     # train data for nested cv
     train_dataset = {
         "train": defaultdict(dict),
@@ -40,19 +37,9 @@ def make_time_series_split(
     test_period = pd.Timedelta(days=test_size)
     end_test_cutoffs = [cutoff + test_period for cutoff in cutoffs]
 
-    # cutoff warning
-    for start_cutoff, end_cutoff in zip(cutoffs, end_test_cutoffs):
-        if end_cutoff >= train_test_split_date:
-            warnings.warn(
-                f"cutoff ({start_cutoff} + {test_size} days) >= train_test_split_date: {train_test_split_date}."
-                f"Skipping this cutoff."
-            )
-
     family_to_store_grouped = df.groupby(["family", "store_nbr"])
     for (family, store), group in tqdm(family_to_store_grouped):
         for start_test, end_test in zip(cutoffs, end_test_cutoffs):
-            if end_test >= train_test_split_date:
-                continue
             if start_test <= group["ds"].min():
                 continue
 
