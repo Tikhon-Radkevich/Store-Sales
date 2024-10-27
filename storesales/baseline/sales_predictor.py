@@ -14,7 +14,6 @@ class SalesPredictor:
     def __init__(
         self,
         model_wrappers: dict[str, ModelBaseWrapper],
-        outer_cutoffs: list[pd.Timestamp],
         inner_cutoffs: list[int],
         family_groups: list[tuple[str]],
         optuna_optimize_kwargs: dict,
@@ -26,7 +25,6 @@ class SalesPredictor:
     ):
         self.model_wrappers = model_wrappers
         self.inner_cutoffs = inner_cutoffs
-        self.outer_cutoffs = outer_cutoffs
         self.family_groups = family_groups
         self.optuna_optimize_kwargs = optuna_optimize_kwargs
         self.family_group_to_stores = family_group_to_stores
@@ -42,7 +40,11 @@ class SalesPredictor:
         self.store_family_loss_storage = defaultdict(list)
         self.tune_loss_storage = self._initialize_tune_loss_storage()
 
-    def evaluate(self, test_dataset): ...
+    def calc_total_fit_loss(self):
+        losses = [
+            value["loss"] for _key, value in self.family_to_model_params_storage.items()
+        ]
+        return np.mean(losses)
 
     def combine_with_predictor(self, predictor: "SalesPredictor") -> None:
         # will replace trained model with new ones from `predictor`
