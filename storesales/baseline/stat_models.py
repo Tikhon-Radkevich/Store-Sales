@@ -54,19 +54,26 @@ class DayOfWeekMeanModel:
 class WeightedDayMeanModel:
     def __init__(
         self,
+        days_window: int,
         weeks_window: int,
         months_window: int,
         years_window: int,
+        day_weight: float,
         week_weight: float,
         month_weight: float,
         year_weight: float,
     ):
+        self.days_window = days_window
         self.weeks_window = weeks_window
         self.months_window = months_window
         self.years_window = years_window
+
+        self.day_weight = day_weight
         self.week_weight = week_weight
         self.month_weight = month_weight
         self.year_weight = year_weight
+
+        self.daily_mean_predictions = None
         self.train = None
 
         self._process_weights()
@@ -74,7 +81,16 @@ class WeightedDayMeanModel:
     def fit(self, train: pd.DataFrame) -> None:
         self.train = train.set_index("ds")
 
+        self.daily_mean_predictions = train["y"].tail(self.days_window).mean()
+
+        if pd.isna(self.daily_mean_predictions):
+            self.days_window = 0
+            self._process_weights()
+            self.daily_mean_predictions = 0
+
     def _process_weights(self):
+        if self.days_window == 0:
+            self.day_weight = 0
         if self.weeks_window == 0:
             self.week_weight = 0
         if self.months_window == 0:
@@ -82,7 +98,10 @@ class WeightedDayMeanModel:
         if self.years_window == 0:
             self.year_weight = 0
 
-        total_weight = self.week_weight + self.month_weight + self.year_weight
+        total_weight = (
+            self.day_weight + self.week_weight + self.month_weight + self.year_weight
+        )
+        self.day_weight /= total_weight
         self.week_weight /= total_weight
         self.month_weight /= total_weight
         self.year_weight /= total_weight
@@ -121,7 +140,8 @@ class WeightedDayMeanModel:
             week_avg, month_avg, year_avg = self._get_day_averages(future_date)
 
             yhat = (
-                (week_avg * self.week_weight)
+                (self.daily_mean_predictions * self.day_weight)
+                + (week_avg * self.week_weight)
                 + (month_avg * self.month_weight)
                 + (year_avg * self.year_weight)
             )
