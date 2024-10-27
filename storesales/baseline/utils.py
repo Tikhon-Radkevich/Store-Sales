@@ -1,4 +1,3 @@
-import warnings
 import random
 from collections import defaultdict
 from joblib import Parallel, delayed
@@ -59,22 +58,26 @@ def calculate_loss_for_date(
     predictor: SalesPredictor, df: pd.DataFrame, date: pd.Timestamp
 ):
     train = df[df["ds"] < date]
-    test = df[(df["ds"] >= date) & (df["ds"] < date + pd.Timedelta(days=16))]
+    test = df[(df["ds"] >= date) & (df["ds"] <= date + pd.Timedelta(days=16))]
 
     predictor.fit(train, disable_tqdm=True)
     prediction = predictor.predict(test, disable_tqdm=True)
-
-    loss = rmsle(prediction["y"], prediction["yhat"])
-    return loss
+    grouped_loss = prediction.groupby("family").apply(
+        lambda x: rmsle(x["y"], x["yhat"])
+    )
+    grouped_loss.name = date.strftime("%Y.%m.%d")
+    return grouped_loss
 
 
 def evaluate(df: pd.DataFrame, predictor: SalesPredictor, n_jobs: int = -1):
-    series_test_range = pd.date_range(TRAIN_TEST_SPLIT_DATE, df["ds"].max(), freq="D")
+    series_test_range = pd.date_range(
+        TRAIN_TEST_SPLIT_DATE, df["ds"].max() - pd.Timedelta(days=16), freq="D"
+    )
     losses = Parallel(n_jobs=n_jobs)(
         delayed(calculate_loss_for_date)(predictor, df, date)
         for date in tqdm(series_test_range)
     )
-    return np.mean(losses)
+    return pd.concat(losses, axis=1)
 
 
 def run_study(dataset, predictor: SalesPredictor, optuna_log_off=True):
