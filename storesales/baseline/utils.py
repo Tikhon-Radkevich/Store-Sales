@@ -62,25 +62,32 @@ def calculate_loss_for_date(
 
     predictor.fit(train, disable_tqdm=True)
     prediction = predictor.predict(test, disable_tqdm=True)
-    grouped_loss = prediction.groupby("family").apply(
+    grouped_loss = prediction.groupby(["family", "store_nbr"]).apply(
         lambda x: rmsle(x["y"], x["yhat"])
     )
     grouped_loss.name = date.strftime("%Y.%m.%d")
     return grouped_loss
 
 
-def evaluate(df: pd.DataFrame, predictor: SalesPredictor, n_jobs: int = -1):
+def evaluate(
+    df: pd.DataFrame,
+    predictor: SalesPredictor,
+    n_jobs: int = -1,
+    disable_tqdm: bool = False,
+):
     series_test_range = pd.date_range(
         TRAIN_TEST_SPLIT_DATE, df["ds"].max() - pd.Timedelta(days=16), freq="D"
     )
     losses = Parallel(n_jobs=n_jobs)(
         delayed(calculate_loss_for_date)(predictor, df, date)
-        for date in tqdm(series_test_range)
+        for date in tqdm(series_test_range, disable=disable_tqdm)
     )
     return pd.concat(losses, axis=1)
 
 
-def run_study(dataset, predictor: SalesPredictor, optuna_log_off=True):
+def run_study(
+    dataset, predictor: SalesPredictor, optuna_log_off=True, disable_tqdm=False
+):
     if optuna_log_off:
         optuna.logging.set_verbosity(optuna.logging.ERROR)
 
@@ -98,7 +105,9 @@ def run_study(dataset, predictor: SalesPredictor, optuna_log_off=True):
 
         family_group_loss = []
         for i_sample, (store, family) in tqdm(
-            enumerate(sampled_store_family), total=len(sampled_store_family)
+            enumerate(sampled_store_family),
+            total=len(sampled_store_family),
+            disable=disable_tqdm,
         ):
             for start_test, outer_train in dataset["train"][(store, family)].items():
                 study = optuna.create_study(direction="minimize")
@@ -141,13 +150,8 @@ def run_study(dataset, predictor: SalesPredictor, optuna_log_off=True):
                     loss=fold_test_loss,
                 )
         predictor.calc_and_log_mean_params(family_group)
-        print(f"RMSLE: {np.mean(family_group_loss)}\n")
+        print(f"RMSLE: {np.mean(family_group_loss)}")
 
-    losses = [
-        value["loss"]
-        for _key, value in predictor.family_to_model_params_storage.items()
-    ]
-    print(f"\n\nTotal RMSLE: {np.mean(losses)} \n")
     return predictor
 
 
