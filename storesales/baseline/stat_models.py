@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 
 
@@ -62,6 +63,7 @@ class WeightedDayMeanModel:
         week_weight: float,
         month_weight: float,
         year_weight: float,
+        bias: float = 0,
     ):
         self.days_window = days_window
         self.weeks_window = weeks_window
@@ -72,6 +74,8 @@ class WeightedDayMeanModel:
         self.week_weight = week_weight
         self.month_weight = month_weight
         self.year_weight = year_weight
+
+        self.bias = bias
 
         self.daily_mean_predictions = None
         self.train = None
@@ -144,7 +148,9 @@ class WeightedDayMeanModel:
                 + (week_avg * self.week_weight)
                 + (month_avg * self.month_weight)
                 + (year_avg * self.year_weight)
+                + self.bias
             )
+            yhat = np.clip(yhat, 0, None)
             yhat_values.append(yhat)
 
         future["yhat"] = yhat_values
