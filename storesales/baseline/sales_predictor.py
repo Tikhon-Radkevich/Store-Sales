@@ -1,3 +1,4 @@
+import pickle
 from itertools import product
 from collections import defaultdict
 
@@ -32,6 +33,8 @@ class SalesPredictor:
         self.n_single_store_family_choices = n_single_store_family_choices
         self.initial = initial
         self.horizon = horizon
+
+        self.eval_loss_csv = None
 
         self.tune_storage = self._initialize_tune_storage()
         self.store_family_pairs = self._initialize_store_family_pairs()
@@ -99,6 +102,15 @@ class SalesPredictor:
 
         predictions = pd.concat(prediction_list, ignore_index=True)
         return predictions
+
+    def save(self, model_path: str) -> None:
+        with open(model_path, "wb") as f:
+            pickle.dump(self, f)
+
+    @staticmethod
+    def load(model_path: str) -> "SalesPredictor":
+        with open(model_path, "rb") as f:
+            return pickle.load(f)
 
     def log_study(
         self,
