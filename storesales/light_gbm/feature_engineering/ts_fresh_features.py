@@ -42,7 +42,9 @@ def make_roll_features(df: pd.DataFrame):
     features_df.index.names = ["store_family", "date"]
 
     features_df.reset_index(level=["store_family", "date"], inplace=True)
-    features_df[["store_nbr", "family"]] = features_df["store_family"].str.split("-", expand=True)
+    features_df[["store_nbr", "family"]] = features_df["store_family"].str.split(
+        "-", expand=True
+    )
     features_df.drop(columns=["store_family"], inplace=True)
 
     return features_df
