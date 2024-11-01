@@ -2,7 +2,9 @@ import pandas as pd
 from darts import TimeSeries
 
 
-def get_covariates_dicts(data_df: pd.DataFrame, future_cols: list[str], past_cols: list[str]):
+def get_covariates_dicts(
+    data_df: pd.DataFrame, future_cols: list[str], past_cols: list[str]
+):
     future_dict = {}
     past_dict = {}
 
@@ -28,8 +30,6 @@ def get_covariates_dicts(data_df: pd.DataFrame, future_cols: list[str], past_col
             static_cols=None,
         )
 
-        past_dict[family] = [
-            p.with_static_covariates(None) for p in past_covariates
-        ]
+        past_dict[family] = [p.with_static_covariates(None) for p in past_covariates]
 
     return future_dict, past_dict
