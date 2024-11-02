@@ -15,12 +15,10 @@ def get_series_and_id_dicts(df: pd.DataFrame, static_cols: list[str]):
             static_cols=static_cols,
         )
         series_id = [
-            {"store_nbr": s.static_covariates.store_nbr.iloc[0], "family": family}
+            {"store_nbr": int(s.static_covariates.store_nbr.iloc[0]), "family": family}
             for s in series
         ]
         series_id_dict[family] = series_id
-
-        # series = [s.with_static_covariates(None) for s in series]
 
         series_dict[family] = series
 
