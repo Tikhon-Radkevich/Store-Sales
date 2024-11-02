@@ -8,28 +8,22 @@ def get_covariates_dicts(
     future_dict = {}
     past_dict = {}
 
-    # family_grouped = data_df.groupby("family") todo
-    for family in data_df["family"].unique():
-        family_data = data_df[data_df["family"] == family]
-
-        future_covariates = TimeSeries.from_group_dataframe(
+    for family, family_data in data_df.groupby("family"):
+        future_covs = TimeSeries.from_group_dataframe(
             df=family_data,
             time_col="date",
             value_cols=future_cols,
             group_cols="store_nbr",
         )
-        future_dict[family] = [
-            f.with_static_covariates(None) for f in future_covariates
-        ]
+        future_dict[family] = [f.with_static_covariates(None) for f in future_covs]
 
-        past_covariates = TimeSeries.from_group_dataframe(
+        past_covs = TimeSeries.from_group_dataframe(
             df=family_data,
             time_col="date",
             value_cols=past_cols,
             group_cols="store_nbr",
-            static_cols=None,
         )
 
-        past_dict[family] = [p.with_static_covariates(None) for p in past_covariates]
+        past_dict[family] = [p.with_static_covariates(None) for p in past_covs]
 
     return future_dict, past_dict
