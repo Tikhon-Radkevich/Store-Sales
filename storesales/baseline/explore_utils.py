@@ -9,12 +9,12 @@ def family_store_con(df, f: str, s_n: int):
 
 
 def store_family_prediction_plot(
-        predictor: SalesPredictor,
-        data_to_plot: pd.DataFrame,
-        family: str,
-        store_nbr: int,
-        test_data=None,
-        data_slice: int = 1000,
+    predictor: SalesPredictor,
+    data_to_plot: pd.DataFrame,
+    family: str,
+    store_nbr: int,
+    test_data=None,
+    data_slice: int = 1000,
 ):
     if test_data is None:
         train_data = data_to_plot[:-16]

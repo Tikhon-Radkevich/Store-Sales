@@ -1,3 +1,4 @@
+import os
 import pickle
 from itertools import product
 from collections import defaultdict
@@ -9,6 +10,7 @@ import numpy as np
 import optuna
 
 from storesales.baseline.model_wrappers import ModelBaseWrapper
+from storesales.constants import MODELS_PATH
 
 
 class SalesPredictor:
@@ -108,8 +110,9 @@ class SalesPredictor:
             pickle.dump(self, f)
 
     @staticmethod
-    def load(model_path: str) -> "SalesPredictor":
-        with open(model_path, "rb") as f:
+    def load(model_name: str) -> "SalesPredictor":
+        model_file_path = os.path.join(MODELS_PATH, model_name)
+        with open(model_file_path, "rb") as f:
             return pickle.load(f)
 
     def log_study(

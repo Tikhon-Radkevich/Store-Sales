@@ -17,7 +17,7 @@ from storesales.constants import (
     EXTERNAL_TEST_PATH,
     EXTERNAL_OIL_PATH,
     EXTERNAL_HOLIDAYS_EVENTS_PATH,
-    TRAIN_TEST_SPLIT_DATE,
+    START_TEST_DATE,
 )
 
 
@@ -76,7 +76,7 @@ def evaluate(
     disable_tqdm: bool = False,
 ):
     series_test_range = pd.date_range(
-        TRAIN_TEST_SPLIT_DATE, df["ds"].max() - pd.Timedelta(days=16), freq="D"
+        START_TEST_DATE, df["ds"].max() - pd.Timedelta(days=16), freq="D"
     )
     losses = Parallel(n_jobs=n_jobs)(
         delayed(calculate_loss_for_date)(predictor, df, date)
