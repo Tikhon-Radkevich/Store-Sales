@@ -30,6 +30,7 @@ class TargetRollParam:
 
 @dataclass
 class ExtractFeaturesParam:
+    timeseries_container: pd.DataFrame
     default_fc_parameters: ComprehensiveFCParameters = MinimalFCParameters()
     column_id: str = "id"
     column_sort: str = "time"
