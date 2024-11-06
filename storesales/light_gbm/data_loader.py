@@ -17,28 +17,34 @@ class DataLoader:
     ):
         self.data_df = data_df
 
-        self.train_rolls = None
-        self.train_featured = None
-        self.target_grouped = None
-        self.all_train_rolls = None
+        self.train_rolls: pd.DataFrame
+        self.train_featured: pd.DataFrame
+        self.target_grouped: pd.DataFrame
+        self.all_train_rolls: pd.DataFrame
 
         self.train_roll_dict_param = init_dataloader_param.train_roll_param.__dict__
         self.target_roll_dict_param = init_dataloader_param.target_roll_param.__dict__
-        self.extract_features_dict_param = init_dataloader_param.extract_features_param.__dict__
+        self.extract_features_dict_param = (
+            init_dataloader_param.extract_features_param.__dict__
+        )
 
         self._init()
 
-        self.X_train, self.X_valid, self.y_train, self.y_valid = train_test_split(
-            self.train_featured,
-            self.target_grouped,
+        train_ids, valid_ids = train_test_split(
+            self.train_featured.index,
             test_size=test_size,
             random_state=random_state,
         )
 
+        self.X_train = self.train_featured.loc[train_ids]
+        self.X_valid = self.train_featured.loc[valid_ids]
+        self.y_train = self.target_grouped.loc[train_ids]
+        self.y_valid = self.target_grouped.loc[valid_ids]
+
         self.validation_storage = {}
 
     def get_fit_target(self):
-        return self.y_train.apply(lambda sales: sales[0])
+        return self.y_train.groupby(level=["id", "time"])["sales"].head(1)
 
     def _init(self):
         all_train_rolls = roll_time_series(**self.train_roll_dict_param)
@@ -61,10 +67,9 @@ class DataLoader:
         self.all_train_rolls = all_train_rolls
 
         target_rolls = target_rolls[target_rolls["id"].isin(comon_ids)]
-
-        self.target_grouped = target_rolls.groupby("id")["sales"].apply(list)
-        self.target_grouped.index = pd.MultiIndex.from_tuples(self.target_grouped.index)
-        self.target_grouped.index.names = ["id", "time"]
+        target_rolls.index = pd.MultiIndex.from_tuples(target_rolls["id"])
+        target_rolls.index.names = ["id", "time"]
+        self.target_grouped = target_rolls
 
         self.train_rolls.index = pd.MultiIndex.from_tuples(self.train_rolls["id"])
         self.train_rolls.index.names = ["id", "time"]
@@ -81,4 +86,3 @@ class DataLoader:
         train_featured.columns = train_featured.columns.str.replace(" ", "_")
 
         return train_featured
-
