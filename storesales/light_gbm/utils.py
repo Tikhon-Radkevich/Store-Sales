@@ -1,7 +1,6 @@
 import os
 
 import pandas as pd
-from darts import TimeSeries
 
 from storesales.constants import SUBMISSIONS_PATH, EXTERNAL_SAMPLE_SUBMISSION_PATH
 
@@ -17,10 +16,12 @@ def save_submission(df: pd.DataFrame, file_name: str):
     submission_df.to_csv(file_path, index=True)
 
 
-def train_test_split(series: dict[str, list[TimeSeries]], split_date: pd.Timestamp):
-    train_series = {}
-
-    for family, series_list in series.items():
-        train_series[family] = [s.drop_after(split_date) for s in series_list]
-
-    return train_series
+# todo: remove this function
+# def cut_train(dataset: dict[str:FamilyDataset], split_date: pd.Timestamp):
+#     train_dataset = {}
+#
+#     for family, family_dataset in dataset.items():
+#         train_family_dataset = family_dataset.drop_after(split_date)
+#         train_dataset[family] = train_family_dataset
+#
+#     return train_dataset
