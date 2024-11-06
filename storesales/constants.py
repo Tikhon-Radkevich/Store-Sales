@@ -1,5 +1,7 @@
 import os
 
+import pandas as pd
+
 from config import ROOT_PATH
 
 
@@ -29,8 +31,23 @@ EXTERNAL_SAMPLE_SUBMISSION_PATH = os.path.join(
 REPORTS_PATH = os.path.join(ROOT_PATH, "reports")
 SUBMISSIONS_PATH = os.path.join(DATA_PATH, "submissions")
 
-START_TEST_DATE = "2017-08-16"
-END_TEST_DATE = "2017-08-31"
-TRAIN_TEST_SPLIT_DATE = "2017-05-10"
 HORIZON_INT = 16
 HORIZON_STR = "16 days"
+
+END_TRAIN_DATE = "2017-08-15"
+START_SUBMISSION_DATE = "2017-08-16"
+END_SUBMISSION_DATE = "2017-08-31"
+
+START_VALIDATION_DATE = "2017-02-27"
+START_TEST_DATE = "2017-05-10"
+
+TEST_DATE_RANGE = pd.date_range(
+    start=pd.Timestamp(START_TEST_DATE),
+    end=pd.Timestamp(END_TRAIN_DATE) - pd.Timedelta(days=HORIZON_INT),
+    freq="D",
+)
+VALIDATION_DATE_RANGE = pd.date_range(
+    start=pd.Timestamp(START_VALIDATION_DATE),
+    end=pd.Timestamp(START_TEST_DATE) - pd.Timedelta(days=HORIZON_INT + 1),
+    freq="D",
+)
