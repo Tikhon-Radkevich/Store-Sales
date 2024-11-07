@@ -10,9 +10,15 @@ from storesales.constants import VALIDATION_DATE_RANGE
 
 
 class LightGBMModelTuner:
-    def __init__(self, dataset: dict[str, FamilyDataset], families: list[str]):
+    def __init__(
+        self,
+        dataset: dict[str, FamilyDataset],
+        families: list[str],
+        param_suggestor: FamilyLightGBMModelParams,
+    ):
         self.dataset = dataset
         self.families = families
+        self.param_suggestor = param_suggestor
 
         self.studies_dict = self._initialize_studies()
         self._show_progress_bar_dict = (
@@ -32,14 +38,14 @@ class LightGBMModelTuner:
         best_models = {}
         for family in self.families:
             best_params = self.studies_dict[family].best_params
-            best_params.update(FamilyLightGBMModelParams().kwargs)
+            best_params.update(self.param_suggestor.__dict__)
             best_model = LightGBMModel(**best_params)
             best_model.fit(**self.dataset[family].get_train_inputs())
             best_models[family] = best_model
         return best_models
 
     def _objective(self, trial: optuna.Trial, family: str, stride: int) -> float:
-        light_gb_model_kwargs = FamilyLightGBMModelParams().suggest(trial)
+        light_gb_model_kwargs = self.param_suggestor.suggest(trial)
 
         model = LightGBMModel(**light_gb_model_kwargs)
         model.fit(**self.dataset[family].get_train_inputs())
