@@ -72,8 +72,7 @@ def make_dataset(
             group_cols="store_nbr",
             static_cols=static_cols,
         )
-        _ = [s.static_covariates.astype(int) for s in series]
-        stores = [s.static_covariates.store_nbr.iloc[0] for s in series]
+        stores = [int(s.static_covariates.store_nbr.iloc[0]) for s in series]
 
         # future covariates
         future_covs = TimeSeries.from_group_dataframe(
