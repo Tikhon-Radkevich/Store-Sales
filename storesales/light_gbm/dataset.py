@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 
 from darts import TimeSeries
@@ -73,6 +74,7 @@ def make_dataset(
             static_cols=static_cols,
         )
         stores = [int(s.static_covariates.store_nbr.iloc[0]) for s in series]
+        series = [s.astype(np.float32) for s in series]
 
         # future covariates
         future_covs = TimeSeries.from_group_dataframe(
@@ -80,8 +82,9 @@ def make_dataset(
             time_col="date",
             value_cols=future_cols,
             group_cols="store_nbr",
+            drop_group_cols=["store_nbr"],
         )
-        future_covs = [f.with_static_covariates(None) for f in future_covs]
+        future_covs = [f.astype(np.float32) for f in future_covs]
 
         # past covariates
         past_covs = TimeSeries.from_group_dataframe(
@@ -89,8 +92,9 @@ def make_dataset(
             time_col="date",
             value_cols=past_cols,
             group_cols="store_nbr",
+            drop_group_cols=["store_nbr"],
         )
-        past_covs = [p.with_static_covariates(None) for p in past_covs]
+        past_covs = [p.astype(np.float32) for p in past_covs]
 
         # Add FamilyDataset
         dataset[family] = FamilyDataset(
