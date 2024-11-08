@@ -17,6 +17,28 @@ def load_oil(external_oil_path: str) -> pd.DataFrame:
     return oil_df
 
 
+def load_stores(external_stores_path: str) -> pd.DataFrame:
+    stores_df = pd.read_csv(external_stores_path)
+
+    factorize_columns = ["city", "state", "type"]
+    for col in factorize_columns:
+        stores_df[col], _ = pd.factorize(stores_df[col], sort=True)
+
+    return stores_df
+
+
+def create_date_features(df: pd.DataFrame, pref: str) -> pd.DataFrame:
+    dates_dt = df["date"].dt
+
+    date_features_df = pd.DataFrame(index=df.index)
+    date_features_df[f"{pref}day"] = dates_dt.day
+    date_features_df[f"{pref}month"] = dates_dt.month
+    date_features_df[f"{pref}year"] = dates_dt.year
+    date_features_df[f"{pref}day_of_week"] = dates_dt.dayofweek
+    date_features_df[f"{pref}day_of_year"] = dates_dt.dayofyear
+    return date_features_df
+
+
 def save_submission(df: pd.DataFrame, file_name: str):
     df = df.set_index("id")
 
