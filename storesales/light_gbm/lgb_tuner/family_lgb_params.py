@@ -8,7 +8,6 @@ import optuna
 class FamilyLightGBMModelParams:
     # extra_trees=True,
     # use_quantized_grad=True,
-    # boosting="dart",
     # early_stopping_rounds=10,
 
     lags_future_covariates: list[int]
@@ -22,9 +21,9 @@ class FamilyLightGBMModelParams:
     n_jobs: int = 1
     force_row_wise: bool = True
 
-    def suggest(self, trial: optuna.Trial) -> dict:
+    def suggest(self, trial: optuna.trial.BaseTrial) -> dict:
         suggestion = dict(
-            num_leaves=trial.suggest_int("num_leaves", 48, 512),
+            num_leaves=trial.suggest_int("num_leaves", 16, 88),
             max_depth=trial.suggest_int("max_depth", 4, 26),
             learning_rate=trial.suggest_float("learning_rate", 1e-3, 1e-1, log=True),
             n_estimators=trial.suggest_int("n_estimators", 100, 400),
@@ -35,7 +34,7 @@ class FamilyLightGBMModelParams:
             min_gain_to_split=trial.suggest_float(
                 "min_gain_to_split", 1e-3, 0.2, log=True
             ),
-            max_cat_threshold=trial.suggest_int("max_cat_threshold", 8, 32),
+            max_cat_threshold=trial.suggest_int("max_cat_threshold", 8, 28),
         )
         suggestion.update(self.__dict__)
         return suggestion
