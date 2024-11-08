@@ -37,7 +37,7 @@ class FamilyDataset:
         return covariates
 
     def get_inputs(self, series=None):
-        inputs = {"series": self.series if series is None else series}
+        inputs = {"series": series or self.series}
         inputs.update(self.get_covariates())
         return inputs
 
@@ -52,14 +52,14 @@ class FamilyDataset:
         return self.get_cut_inputs(self.start_submission_date)
 
 
-def make_dataset(
+def make_family_datasets(
     df: pd.DataFrame,
     featured_df: pd.DataFrame,
     static_cols: list[str],
     future_cols: list[str],
     past_cols: list[str],
 ) -> dict[str, FamilyDataset]:
-    dataset = {}
+    family_datasets = {}
 
     target_family_groups = df.groupby("family")
     featured_family_groups = featured_df.groupby("family")
@@ -97,7 +97,7 @@ def make_dataset(
         past_covs = [p.astype(np.float32) for p in past_covs]
 
         # Add FamilyDataset
-        dataset[family] = FamilyDataset(
+        family_datasets[family] = FamilyDataset(
             family=family,
             series=series,
             stores=stores,
@@ -107,4 +107,4 @@ def make_dataset(
             start_submission_date=START_SUBMISSION_DATE,
         )
 
-    return dataset
+    return family_datasets
