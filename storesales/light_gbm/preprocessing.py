@@ -2,6 +2,7 @@ import pandas as pd
 
 
 def make_daily(df: pd.DataFrame) -> pd.DataFrame:
+    # todo: make more native
     multi_idx = pd.MultiIndex.from_product(
         [
             pd.date_range(df["date"].min(), df["date"].max()),
@@ -64,5 +65,8 @@ def preprocess(df: pd.DataFrame, zero_gap_size_to_replace=10) -> pd.DataFrame:
         .apply(interpolate_missing_sales, include_groups=False)
         .reset_index(level=["store_nbr", "family"])
     )
+
+    # todo: some series will have all NaNs.
+    interpolated_sales_df.fillna(0, inplace=True)
 
     return interpolated_sales_df
