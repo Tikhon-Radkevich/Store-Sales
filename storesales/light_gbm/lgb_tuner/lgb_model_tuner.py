@@ -25,8 +25,10 @@ class LightGBMModelTuner:
             self._initialize_show_progress_bar()
         )  # todo: one progress bar
 
-    def run_parallel_tune(self, eval_stride: int = 5, n_trials: int = 10) -> None:
-        tuned_studies = Parallel(n_jobs=len(self.families))(
+    def run_parallel_tune(
+        self, n_jobs: int, eval_stride: int = 5, n_trials: int = 10
+    ) -> None:
+        tuned_studies = Parallel(n_jobs=n_jobs)(
             delayed(self._parallel_optuna_study)(f, eval_stride, n_trials)
             for f in self.families
         )
@@ -34,15 +36,19 @@ class LightGBMModelTuner:
             self.studies_dict[family] = study
         return
 
-    def fit_best(self) -> dict[str, LightGBMModel]:
-        best_models = {}
-        for family in self.families:
-            best_params = self.studies_dict[family].best_params
-            best_params.update(self.param_suggestor.__dict__)
-            best_model = LightGBMModel(**best_params)
-            best_model.fit(**self.dataset[family].get_train_inputs())
-            best_models[family] = best_model
-        return best_models
+    def fit_best(self, n_jobs: int) -> dict[str, LightGBMModel]:
+        best_models = Parallel(n_jobs=n_jobs)(
+            delayed(self._parallel_fit_best)(family) for family in self.families
+        )
+        return dict(best_models)
+
+    def _parallel_fit_best(self, family: str) -> tuple[str, LightGBMModel]:
+        best_trial = self.studies_dict[family].best_trial
+        best_params = self.param_suggestor.suggest(best_trial)
+
+        best_model = LightGBMModel(**best_params)
+        best_model.fit(**self.dataset[family].get_train_inputs())
+        return family, best_model
 
     def _objective(self, trial: optuna.Trial, family: str, stride: int) -> float:
         light_gb_model_kwargs = self.param_suggestor.suggest(trial)
