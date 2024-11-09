@@ -1,3 +1,4 @@
+import os
 import random
 from collections import defaultdict
 from joblib import Parallel, delayed
@@ -18,6 +19,8 @@ from storesales.constants import (
     EXTERNAL_OIL_PATH,
     EXTERNAL_HOLIDAYS_EVENTS_PATH,
     START_TEST_DATE,
+    LOSSES_DATA_PATH,
+    MODELS_PATH,
 )
 
 
@@ -68,6 +71,10 @@ def calculate_loss_for_date(
     grouped_loss.name = date.strftime("%Y.%m.%d")
     return grouped_loss
 
+    # todo: different loss
+    # loss = rmsle(prediction["y"], prediction["yhat"])
+    # return loss
+
 
 def evaluate(
     df: pd.DataFrame,
@@ -82,6 +89,7 @@ def evaluate(
         delayed(calculate_loss_for_date)(predictor, df, date)
         for date in tqdm(series_test_range, disable=disable_tqdm)
     )
+    # return np.mean(losses) todo: different loss
     return pd.concat(losses, axis=1)
 
 
@@ -197,3 +205,17 @@ def load_baseline_data(use_light_gbm_preprocessing=False):
 
 def load_submission():
     return pd.read_csv(EXTERNAL_SAMPLE_SUBMISSION_PATH, index_col="id")
+
+
+def save_predictor_and_loss_df(
+    predictor: SalesPredictor,
+    loss_df: pd.DataFrame,
+    loss_file_name: str,
+    predictor_file_name: str,
+):
+    loss_file = os.path.join(LOSSES_DATA_PATH, loss_file_name)
+    loss_df.to_csv(loss_file, index=True)
+    predictor.eval_loss_csv = loss_file
+
+    model_file = os.path.join(MODELS_PATH, predictor_file_name)
+    predictor.save(model_file)
