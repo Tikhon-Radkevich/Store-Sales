@@ -23,7 +23,7 @@ class FamilyLightGBMModelParams:
 
     def suggest(self, trial: optuna.trial.BaseTrial) -> dict:
         suggestion = dict(
-            num_leaves=trial.suggest_int("num_leaves", 16, 88),
+            num_leaves=trial.suggest_int("num_leaves", 32, 144),
             max_depth=trial.suggest_int("max_depth", 4, 26),
             learning_rate=trial.suggest_float("learning_rate", 1e-3, 1e-1, log=True),
             n_estimators=trial.suggest_int("n_estimators", 100, 400),
