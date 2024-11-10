@@ -3,8 +3,6 @@ import pandas as pd
 
 from darts import TimeSeries
 
-from storesales.constants import START_VALIDATION_DATE, START_SUBMISSION_DATE
-
 
 class FamilyDataset:
     def __init__(
@@ -58,6 +56,8 @@ def make_family_datasets(
     static_cols: list[str],
     future_cols: list[str],
     past_cols: list[str],
+    train_end_date: str,
+    start_submission_date: str,
 ) -> dict[str, FamilyDataset]:
     family_datasets = {}
 
@@ -103,8 +103,8 @@ def make_family_datasets(
             stores=stores,
             future_covariates=future_covs,
             past_covariates=past_covs,
-            train_end_date=START_VALIDATION_DATE,
-            start_submission_date=START_SUBMISSION_DATE,
+            train_end_date=train_end_date,
+            start_submission_date=start_submission_date,
         )
 
     return family_datasets
