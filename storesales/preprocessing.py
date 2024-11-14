@@ -1,16 +1,10 @@
 import pandas as pd
 
 
-def make_daily(df: pd.DataFrame, drop_id: bool = True) -> pd.DataFrame:
-    """
-    Transform data to ensure daily granularity for each combination of date, store_nbr, and family.
+def make_daily(df: pd.DataFrame) -> pd.DataFrame:
+    """Transform data to ensure daily granularity for each combination of date, store_nbr, and family.
+    Fills missing values with 0 for 'sales' and 'onpromotion' columns."""
 
-    Fills missing values with 0 for 'sales' and 'onpromotion' columns.
-
-    id column is not important for training, so it can be dropped.
-
-    - drop_id: bool - if False, interpolation will be used to fill unique missing values.
-    """
     index_names = ["date", "store_nbr", "family"]
 
     multi_idx = pd.MultiIndex.from_product(
@@ -24,11 +18,6 @@ def make_daily(df: pd.DataFrame, drop_id: bool = True) -> pd.DataFrame:
     train = df.set_index(index_names).reindex(multi_idx).reset_index()
 
     train[["sales", "onpromotion"]] = train[["sales", "onpromotion"]].fillna(0.0)
-
-    if drop_id:
-        train.drop(columns="id", inplace=True)
-    else:
-        train["id"] = train["id"].interpolate(method="linear")
 
     return train
 
@@ -71,11 +60,14 @@ def preprocess(df: pd.DataFrame, zero_gap_size_to_replace=10) -> pd.DataFrame:
     """
     Transformation:
 
+    - drop id column;
     - make daily data with 0 filled missing values;
     - remove leading zeros (sequences after transforming will have different lengths);
     - replace zero gaps with None where gap size is greater than `zero_gap_size_to_replace`;
     - interpolate missing sales values.
     """
+    df = df.drop(columns="id")
+
     daily_df = make_daily(df)
 
     no_leading_zeros_df = (
