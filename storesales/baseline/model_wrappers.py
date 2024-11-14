@@ -15,7 +15,7 @@ from storesales.baseline.param_suggestions import (
     FloatSuggestions,
     CategoricalSuggestions,
 )
-from storesales.baseline.loss import rmsle
+from storesales.loss import rmsle
 
 
 class ModelBaseWrapper:
