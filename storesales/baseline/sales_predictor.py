@@ -94,12 +94,13 @@ class SalesPredictor:
 
     def predict(self, test: pd.DataFrame, disable_tqdm: bool = False) -> pd.DataFrame:
         prediction_list = []
+        prediction_cols = ["family", "store_nbr", "ds", "yhat", "y"]
 
         x_test_groups = test.groupby(["store_nbr", "family"])
         for (store_nbr, family), group in tqdm(x_test_groups, disable=disable_tqdm):
             model = self.store_family_to_model_storage[(store_nbr, family)]
 
-            forecast = model.predict(group)
+            forecast = model.predict(group)[prediction_cols]
             prediction_list.append(forecast)
 
         predictions = pd.concat(prediction_list, ignore_index=True)
