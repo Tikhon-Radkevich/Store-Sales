@@ -5,26 +5,12 @@ import pandas as pd
 from darts.models import LightGBMModel
 
 from storesales.light_gbm.dataset import FamilyDataset
-from storesales.constants import SUBMISSIONS_PATH, EXTERNAL_SAMPLE_SUBMISSION_PATH
-
-
-def load_oil(external_oil_path: str) -> pd.DataFrame:
-    oil_df = pd.read_csv(external_oil_path, parse_dates=["date"])
-    oil_df.set_index("date", inplace=True)
-    oil_df = oil_df.asfreq("D")
-    oil_df["dcoilwtico"] = oil_df["dcoilwtico"].ffill()
-    oil_df.dropna(inplace=True)
-    return oil_df
-
-
-def load_stores(external_stores_path: str) -> pd.DataFrame:
-    stores_df = pd.read_csv(external_stores_path)
-
-    factorize_columns = ["city", "state", "type"]
-    for col in factorize_columns:
-        stores_df[col], _ = pd.factorize(stores_df[col], sort=True)
-
-    return stores_df
+from storesales.constants import (
+    START_SUBMISSION_DATE,
+    SUBMISSIONS_PATH,
+    EXTERNAL_SAMPLE_SUBMISSION_PATH,
+    EXTERNAL_TEST_PATH,
+)
 
 
 def create_date_features(df: pd.DataFrame, pref: str) -> pd.DataFrame:
@@ -56,7 +42,7 @@ def save_submission(df: pd.DataFrame, file_name: str):
 def make_submission_predictions(
     dataset: dict[str, FamilyDataset],
     models: dict[str, LightGBMModel],
-    forecast_df: pd.DataFrame,
+    # forecast_df: pd.DataFrame,
     horizon: int = 16,
 ) -> pd.DataFrame:
     """
@@ -66,16 +52,18 @@ def make_submission_predictions(
     """
     predictions = []
 
+    forecast_df = pd.read_csv(EXTERNAL_TEST_PATH, parse_dates=["date"])
+    forecast_df.set_index(["date", "family", "store_nbr"], inplace=True)
+    forecast_df["sales"] = None
+
     for family, family_dataset in tqdm(dataset.items()):
         inputs = family_dataset.get_submission_inputs()
         pred_series = models[family].predict(n=horizon, show_warnings=False, **inputs)
 
         for store_nbr, pred in zip(family_dataset.stores, pred_series):
             pred_df = pred.pd_dataframe(copy=True)
-            pred_df["family"] = family
-            pred_df["store_nbr"] = store_nbr
+            pred_df[["family", "store_nbr"]] = family, store_nbr
             pred_df.set_index(["family", "store_nbr"], append=True, inplace=True)
-            pred_df.index.names = ["ds", "family", "store_nbr"]
             predictions.append(pred_df)
 
         forecast_df.update(pd.concat(predictions)[["sales"]])
@@ -92,7 +80,8 @@ def make_submission_forecast_plot(
 ):
     store_nbr = dataset[family].stores[i_series]
 
-    vals = dataset[family].series[i_series].drop_before(drop_before_date).pd_dataframe()
+    vals = dataset[family].series[i_series].drop_before(drop_before_date)
+    vals_df = vals.drop_after(pd.Timestamp(START_SUBMISSION_DATE)).pd_dataframe()
 
     con = (forecast["family"] == family) & (forecast["store_nbr"] == store_nbr)
     predict_vals = forecast[con][["ds", "sales"]]
@@ -100,4 +89,15 @@ def make_submission_forecast_plot(
     predict_vals.set_index("date", inplace=True)
 
     title = f"{family} - Store {store_nbr}"
-    pd.concat([vals, predict_vals], axis=1).plot(title=title)
+    pd.concat([vals_df, predict_vals], axis=1).plot(title=title)
+
+
+def combine_baseline_losses(baseline_losses: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    # todo: why baseline losses processing is here??
+    losses = []
+    for model_name, loss_df in baseline_losses.items():
+        index = pd.Index([model_name] * len(loss_df), name="model")
+        losses.append(loss_df.set_index(index, append=True))
+
+    baseline_losses_df = pd.concat(losses).sort_index()
+    return baseline_losses_df
