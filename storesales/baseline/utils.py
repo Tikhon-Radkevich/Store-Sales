@@ -9,7 +9,7 @@ import pandas as pd
 
 import optuna
 
-from storesales.light_gbm.preprocessing import preprocess
+from storesales.preprocessing import preprocess
 from storesales.baseline.loss import rmsle
 from storesales.baseline.sales_predictor import SalesPredictor
 from storesales.constants import (
@@ -60,11 +60,7 @@ def make_time_series_dataset(
 def calculate_loss_for_date(
     predictor: SalesPredictor, df: pd.DataFrame, date: pd.Timestamp
 ):
-    train = df[df["ds"] < date]
-    test = df[(df["ds"] >= date) & (df["ds"] <= date + pd.Timedelta(days=16))]
-
-    predictor.fit(train, disable_tqdm=True)
-    prediction = predictor.predict(test, disable_tqdm=True)
+    prediction = make_prediction_for_date(predictor, df, date)
     grouped_loss = prediction.groupby(["family", "store_nbr"]).apply(
         lambda x: rmsle(x["y"], x["yhat"])
     )
@@ -74,6 +70,32 @@ def calculate_loss_for_date(
     # todo: different loss
     # loss = rmsle(prediction["y"], prediction["yhat"])
     # return loss
+
+
+def make_prediction_for_date(
+    predictor: SalesPredictor, df: pd.DataFrame, date: pd.Timestamp
+):
+    train = df[df["ds"] < date]
+    test = df[(df["ds"] >= date) & (df["ds"] <= date + pd.Timedelta(days=15))]
+
+    predictor.fit(train, disable_tqdm=True)
+    prediction = predictor.predict(test, disable_tqdm=True)
+    prediction["prediction_date_id"] = date
+    return prediction
+
+
+def make_parallel_predict(
+    df: pd.DataFrame,
+    predictor: SalesPredictor,
+    series_range: pd.DatetimeIndex,
+    n_jobs: int = -1,
+    disable_tqdm: bool = False,
+):
+    predictions = Parallel(n_jobs=n_jobs)(
+        delayed(make_prediction_for_date)(predictor, df, date)
+        for date in tqdm(series_range, disable=disable_tqdm)
+    )
+    return predictions
 
 
 def evaluate(
