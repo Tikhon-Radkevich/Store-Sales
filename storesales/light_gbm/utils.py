@@ -25,6 +25,21 @@ def plot_feature_importance(lgb_model: LightGBMModel, n_top_features: int = 30):
     plt.show()
 
 
+def print_models_params(lgb_models: dict[str, LightGBMModel]):
+    for family, lgb_model in lgb_models.items():
+        print(f"{family}:")
+        print(f"\t- max_depth: {lgb_model.model.max_depth}")
+        print(f"\t- num_leaves: {lgb_model.model.num_leaves}")
+        print(f"\t- learning_rate: {lgb_model.model.learning_rate}")
+        print(f"\t- n_estimators: {lgb_model.model.n_estimators}")
+        print(f"\t- top_rate: {lgb_model.model.top_rate}")
+        print(f"\t- other_rate: {lgb_model.model.other_rate}")
+        print(f"\t- max_bin: {lgb_model.model.max_bin}")
+        print(f"\t- feature_fraction: {lgb_model.model.feature_fraction}")
+        print(f"\t- max_cat_threshold: {lgb_model.model.max_cat_threshold}")
+        print(f"\t- data_sample_strategy: {lgb_model.model.data_sample_strategy}\n\n")
+
+
 def make_submission_predictions(
     dataset: dict[str, FamilyDataset],
     models: dict[str, LightGBMModel],
