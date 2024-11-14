@@ -29,11 +29,11 @@ class TargetRollParam:
 
 
 @dataclass
-class ExtractFeaturesParam:
+class ExtractFeaturesParams:
     timeseries_container: pd.DataFrame
     default_fc_parameters: ComprehensiveFCParameters = MinimalFCParameters()
     column_id: str = "id"
-    column_sort: str = "time"
+    column_sort: str = "date"
     impute_function: callable = impute
     n_jobs: int = 6
 
@@ -42,4 +42,4 @@ class ExtractFeaturesParam:
 class InitDataLoaderParam:
     train_roll_param: TrainRollParam
     target_roll_param: TargetRollParam
-    extract_features_param: ExtractFeaturesParam
+    extract_features_param: ExtractFeaturesParams
