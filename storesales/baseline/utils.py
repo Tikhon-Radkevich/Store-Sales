@@ -10,7 +10,7 @@ import pandas as pd
 import optuna
 
 from storesales.preprocessing import preprocess
-from storesales.baseline.loss import rmsle
+from storesales.loss import rmsle
 from storesales.baseline.sales_predictor import SalesPredictor
 from storesales.constants import (
     EXTERNAL_TRAIN_PATH,
