@@ -17,7 +17,7 @@ def plot_feature_importance(lgb_model: LightGBMModel, n_top_features: int = 30):
     top_feature_importances = feature_importances[top_indices]
     top_feature_names = np.array(feature_names)[top_indices]
 
-    plt.figure(figsize=(10, 16))
+    plt.figure(figsize=(10, n_top_features//2))
     plt.barh(top_feature_names, top_feature_importances, color="skyblue")
     plt.xlabel("Feature Importance (Gain)")
     plt.title("Top 10 Feature Importance for LightGBM Model")
