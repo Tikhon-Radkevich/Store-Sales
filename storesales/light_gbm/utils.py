@@ -1,42 +1,28 @@
-import os
 from tqdm import tqdm
 
 import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
 from darts.models import LightGBMModel
 
 from storesales.light_gbm.dataset import FamilyDataset
-from storesales.constants import (
-    START_SUBMISSION_DATE,
-    SUBMISSIONS_PATH,
-    EXTERNAL_SAMPLE_SUBMISSION_PATH,
-    EXTERNAL_TEST_PATH,
-)
+from storesales.constants import START_SUBMISSION_DATE, EXTERNAL_TEST_PATH
 
 
-def create_date_features(df: pd.DataFrame, pref: str) -> pd.DataFrame:
-    dates_dt = df["date"].dt
+def plot_feature_importance(lgb_model: LightGBMModel, n_top_features: int = 30):
+    feature_importances = lgb_model.model.feature_importances_
+    feature_names = lgb_model.lagged_feature_names
 
-    date_features_df = pd.DataFrame(index=df.index)
-    date_features_df[f"{pref}day"] = dates_dt.day
-    date_features_df[f"{pref}month"] = dates_dt.month
-    date_features_df[f"{pref}year"] = dates_dt.year
-    date_features_df[f"{pref}day_of_week"] = dates_dt.dayofweek
-    date_features_df[f"{pref}day_of_year"] = dates_dt.dayofyear
-    return date_features_df
+    top_indices = np.argsort(feature_importances)[-n_top_features:]
+    top_feature_importances = feature_importances[top_indices]
+    top_feature_names = np.array(feature_names)[top_indices]
 
-
-def save_submission(df: pd.DataFrame, file_name: str):
-    df = df.set_index("id")
-
-    submission_df = pd.read_csv(EXTERNAL_SAMPLE_SUBMISSION_PATH, index_col="id")
-    submission_df["sales"] = df["sales"]
-
-    file_path = os.path.join(SUBMISSIONS_PATH, file_name)
-    submission_df.to_csv(file_path, index=True)
-
-    print(f"Submission saved to {file_path}")
-
-    return submission_df
+    plt.figure(figsize=(10, 16))
+    plt.barh(top_feature_names, top_feature_importances, color="skyblue")
+    plt.xlabel("Feature Importance (Gain)")
+    plt.title("Top 10 Feature Importance for LightGBM Model")
+    plt.gca().invert_yaxis()
+    plt.show()
 
 
 def make_submission_predictions(
