@@ -53,6 +53,7 @@ class FamilyDataset:
 def make_family_datasets(
     df: pd.DataFrame,
     featured_df: pd.DataFrame,
+    series_value_column: str,
     static_cols: list[str],
     future_cols: list[str],
     past_cols: list[str],
@@ -69,7 +70,7 @@ def make_family_datasets(
         series = TimeSeries.from_group_dataframe(
             df=target_family_groups.get_group(family),
             time_col="date",
-            value_cols="sales",
+            value_cols=series_value_column,
             group_cols="store_nbr",
             static_cols=static_cols,
         )
