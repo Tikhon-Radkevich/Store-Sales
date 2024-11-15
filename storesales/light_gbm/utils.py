@@ -70,31 +70,3 @@ def make_submission_predictions(
 
     forecast_df["sales"] = forecast_df["sales"].clip(lower=0)
     return forecast_df
-
-
-def make_submission_forecast_plot(
-        train_df: pd.DataFrame,
-        forecast: pd.DataFrame,
-        family: str,
-        store_nbr: int,
-        drop_before_date: pd.Timestamp,
-):
-    vals = train_df[(train_df["family"] == family) &
-                    (train_df["store_nbr"] == store_nbr) &
-                    (train_df["date"] >= drop_before_date)]
-    vals = vals[["date", "sales"]].set_index("date")
-
-    con = (forecast["family"] == family) & (forecast["store_nbr"] == store_nbr)
-    predict_vals = forecast[con][["ds", "sales"]]
-    predict_vals.rename(columns={"ds": "date"}, inplace=True)
-    predict_vals.set_index("date", inplace=True)
-
-    combined = pd.concat([vals, predict_vals], axis=1, keys=["Train Sales", "Forecast Sales"])
-    model = forecast[con].iloc[0]["model"]
-
-    title = f"{model} :: {family} :: Store {store_nbr}"
-    combined.plot(title=title, figsize=(12, 6))
-    plt.ylabel("Sales")
-    plt.xlabel("Date")
-    plt.grid()
-    plt.show()
