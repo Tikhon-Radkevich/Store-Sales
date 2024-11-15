@@ -56,7 +56,9 @@ def interpolate_missing_sales(group: pd.DataFrame) -> pd.DataFrame:
     return group
 
 
-def preprocess(df: pd.DataFrame, zero_gap_size_to_replace=10) -> pd.DataFrame:
+def preprocess(
+    df: pd.DataFrame, zero_gap_size_to_replace=10, remove_zero_gaps=True
+) -> pd.DataFrame:
     """
     Transformation:
 
@@ -68,24 +70,25 @@ def preprocess(df: pd.DataFrame, zero_gap_size_to_replace=10) -> pd.DataFrame:
     """
     df = df.drop(columns="id")
 
-    daily_df = make_daily(df)
+    df = make_daily(df)
 
-    no_leading_zeros_df = (
-        daily_df.groupby(["store_nbr", "family"])
+    df = (
+        df.groupby(["store_nbr", "family"])
         .apply(remove_leading_zeros, include_groups=False)
         .reset_index(level=["store_nbr", "family"])
     )
 
-    no_zero_gaps_df = (
-        no_leading_zeros_df.groupby(["store_nbr", "family"])
-        .apply(replace_zero_gaps, zero_gap_size_to_replace, include_groups=False)
-        .reset_index(level=["store_nbr", "family"])
-    )
+    if remove_zero_gaps:
+        df = (
+            df.groupby(["store_nbr", "family"])
+            .apply(replace_zero_gaps, zero_gap_size_to_replace, include_groups=False)
+            .reset_index(level=["store_nbr", "family"])
+        )
 
-    interpolated_sales_df = (
-        no_zero_gaps_df.groupby(["store_nbr", "family"])
+    df = (
+        df.groupby(["store_nbr", "family"])
         .apply(interpolate_missing_sales, include_groups=False)
         .reset_index(level=["store_nbr", "family"])
     )
 
-    return interpolated_sales_df
+    return df
