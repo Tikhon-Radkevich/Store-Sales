@@ -15,6 +15,7 @@ def parallel_prediction(
     parallel=False,
 ):
     """Ger all predicted and true values for each date in `prediction_range`"""
+
     def make_prediction(family: str) -> pd.DataFrame:
         series = dataset[family].series
         stores = dataset[family].stores
@@ -62,10 +63,12 @@ def evaluate(
     parallel=False,
 ) -> pd.DataFrame:
     def evaluate_family(family: str) -> pd.DataFrame:
+        scaler = dataset[family].scaler
         series = dataset[family].series
+        stores = dataset[family].stores
 
         multi_index = pd.MultiIndex.from_product(
-            [[family], dataset[family].stores], names=["family", "store_nbr"]
+            [[family], stores], names=["family", "store_nbr"]
         )
 
         family_losses = []
@@ -76,8 +79,11 @@ def evaluate(
             true_values = [s.slice_intersect(p) for p, s in zip(preds, series)]
 
             loss = [
-                clipped_rmsle(t.values(), p.values())
-                for t, p in zip(true_values, preds)
+                clipped_rmsle(
+                    scaler.inverse_transform_by_key(t.values(), family, s),
+                    scaler.inverse_transform_by_key(p.values(), family, s),
+                )
+                for t, p, s in zip(true_values, preds, stores)
             ]
             series_loss = pd.Series(
                 loss, index=multi_index, name=test_date.strftime("%Y.%m.%d")
