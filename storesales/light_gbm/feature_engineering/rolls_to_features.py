@@ -6,7 +6,9 @@ from tsfresh import extract_features
 from tsfresh.feature_extraction import ComprehensiveFCParameters
 from tsfresh.utilities.dataframe_functions import roll_time_series
 
-from storesales.light_gbm.feature_engineering.rolling_window_params import ExtractFeaturesParams
+from storesales.light_gbm.feature_engineering.rolling_window_params import (
+    ExtractFeaturesParams,
+)
 
 
 @dataclass
