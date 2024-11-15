@@ -7,6 +7,7 @@ from darts import TimeSeries
 class FamilyDataset:
     def __init__(
         self,
+        scaler,
         family: str,
         series: list[TimeSeries],
         stores: list[int],
@@ -15,6 +16,7 @@ class FamilyDataset:
         future_covariates: list[TimeSeries] | None = None,
         past_covariates: list[TimeSeries] | None = None,
     ):
+        self.scaler = scaler
         self.family = family
         self.series = series
         self.stores = stores
@@ -51,6 +53,7 @@ class FamilyDataset:
 
 
 def make_family_datasets(
+    scaler,
     df: pd.DataFrame,
     featured_df: pd.DataFrame,
     series_value_column: str,
@@ -99,6 +102,7 @@ def make_family_datasets(
 
         # Add FamilyDataset
         family_datasets[family] = FamilyDataset(
+            scaler=scaler,
             family=family,
             series=series,
             stores=stores,
