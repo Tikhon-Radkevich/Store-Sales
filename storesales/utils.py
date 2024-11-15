@@ -44,15 +44,17 @@ def save_submission(df: pd.DataFrame, file_name: str):
 
 
 def make_submission_forecast_plot(
-        train_df: pd.DataFrame,
-        forecast: pd.DataFrame,
-        family: str,
-        store_nbr: int,
-        drop_before_date: pd.Timestamp,
+    train_df: pd.DataFrame,
+    forecast: pd.DataFrame,
+    family: str,
+    store_nbr: int,
+    drop_before_date: pd.Timestamp,
 ):
-    vals = train_df[(train_df["family"] == family) &
-                    (train_df["store_nbr"] == store_nbr) &
-                    (train_df["date"] >= drop_before_date)]
+    vals = train_df[
+        (train_df["family"] == family)
+        & (train_df["store_nbr"] == store_nbr)
+        & (train_df["date"] >= drop_before_date)
+    ]
     vals = vals[["date", "sales"]].set_index("date")
 
     con = (forecast["family"] == family) & (forecast["store_nbr"] == store_nbr)
@@ -60,7 +62,9 @@ def make_submission_forecast_plot(
     predict_vals.rename(columns={"ds": "date"}, inplace=True)
     predict_vals.set_index("date", inplace=True)
 
-    combined = pd.concat([vals, predict_vals], axis=1, keys=["Train Sales", "Forecast Sales"])
+    combined = pd.concat(
+        [vals, predict_vals], axis=1, keys=["Train Sales", "Forecast Sales"]
+    )
     model = forecast[con].iloc[0]["model"]
 
     title = f"{model} :: {family} :: Store {store_nbr}"
