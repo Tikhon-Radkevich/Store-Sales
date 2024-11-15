@@ -17,7 +17,7 @@ def plot_feature_importance(lgb_model: LightGBMModel, n_top_features: int = 30):
     top_feature_importances = feature_importances[top_indices]
     top_feature_names = np.array(feature_names)[top_indices]
 
-    plt.figure(figsize=(10, n_top_features//2))
+    plt.figure(figsize=(10, n_top_features // 2))
     plt.barh(top_feature_names, top_feature_importances, color="skyblue")
     plt.xlabel("Feature Importance (Gain)")
     plt.title("Top 10 Feature Importance for LightGBM Model")
@@ -43,7 +43,6 @@ def print_models_params(lgb_models: dict[str, LightGBMModel]):
 def make_submission_predictions(
     dataset: dict[str, FamilyDataset],
     models: dict[str, LightGBMModel],
-    # forecast_df: pd.DataFrame,
     horizon: int = 16,
 ) -> pd.DataFrame:
     """
@@ -69,36 +68,33 @@ def make_submission_predictions(
 
         forecast_df.update(pd.concat(predictions)[["sales"]])
 
+    forecast_df["sales"] = forecast_df["sales"].clip(lower=0)
     return forecast_df
 
 
 def make_submission_forecast_plot(
-    dataset: dict[str, FamilyDataset],
-    forecast: pd.DataFrame,
-    family: str,
-    i_series: int,
-    drop_before_date: pd.Timestamp,
+        train_df: pd.DataFrame,
+        forecast: pd.DataFrame,
+        family: str,
+        store_nbr: int,
+        drop_before_date: pd.Timestamp,
 ):
-    store_nbr = dataset[family].stores[i_series]
-
-    vals = dataset[family].series[i_series].drop_before(drop_before_date)
-    vals_df = vals.drop_after(pd.Timestamp(START_SUBMISSION_DATE)).pd_dataframe()
+    vals = train_df[(train_df["family"] == family) &
+                    (train_df["store_nbr"] == store_nbr) &
+                    (train_df["date"] >= drop_before_date)]
+    vals = vals[["date", "sales"]].set_index("date")
 
     con = (forecast["family"] == family) & (forecast["store_nbr"] == store_nbr)
     predict_vals = forecast[con][["ds", "sales"]]
     predict_vals.rename(columns={"ds": "date"}, inplace=True)
     predict_vals.set_index("date", inplace=True)
 
-    title = f"{family} - Store {store_nbr}"
-    pd.concat([vals_df, predict_vals], axis=1).plot(title=title)
+    combined = pd.concat([vals, predict_vals], axis=1, keys=["Train Sales", "Forecast Sales"])
+    model = forecast[con].iloc[0]["model"]
 
-
-def combine_baseline_losses(baseline_losses: dict[str, pd.DataFrame]) -> pd.DataFrame:
-    # todo: why baseline losses processing is here??
-    losses = []
-    for model_name, loss_df in baseline_losses.items():
-        index = pd.Index([model_name] * len(loss_df), name="model")
-        losses.append(loss_df.set_index(index, append=True))
-
-    baseline_losses_df = pd.concat(losses).sort_index()
-    return baseline_losses_df
+    title = f"{model} :: {family} :: Store {store_nbr}"
+    combined.plot(title=title, figsize=(12, 6))
+    plt.ylabel("Sales")
+    plt.xlabel("Date")
+    plt.grid()
+    plt.show()
