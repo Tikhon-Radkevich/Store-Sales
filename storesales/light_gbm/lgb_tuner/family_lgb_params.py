@@ -10,11 +10,11 @@ class FamilyLightGBMModelParams:
     # use_quantized_grad=True,
     # early_stopping_rounds=10,
 
+    lags: dict[str, int]
     lags_future_covariates: list[int]
     lags_past_covariates: list[str]
-    categorical_static_covariates: list[str]
-    categorical_future_covariates: list[str]
-    lags: int = 24
+    categorical_static_covariates: list[str] | None = None
+    categorical_future_covariates: list[str] | None = None
     data_sample_strategy: str = "goss"
     random_state: int = 42
     verbosity: int = -1
@@ -23,18 +23,35 @@ class FamilyLightGBMModelParams:
 
     def suggest(self, trial: optuna.trial.BaseTrial) -> dict:
         suggestion = dict(
-            num_leaves=trial.suggest_int("num_leaves", 32, 144),
-            max_depth=trial.suggest_int("max_depth", 4, 26),
+            num_leaves=trial.suggest_int("num_leaves", 8, 56),
+            max_depth=trial.suggest_int("max_depth", 3, 7),
             learning_rate=trial.suggest_float("learning_rate", 1e-3, 1e-1, log=True),
-            n_estimators=trial.suggest_int("n_estimators", 100, 400),
-            top_rate=trial.suggest_float("top_rate", 0.1, 0.4),
-            other_rate=trial.suggest_float("other_rate", 0.05, 0.2),
-            max_bin=trial.suggest_int("max_bin", 48, 202),
-            feature_fraction=trial.suggest_float("feature_fraction", 0.1, 0.7),
-            min_gain_to_split=trial.suggest_float(
-                "min_gain_to_split", 1e-3, 0.2, log=True
-            ),
-            max_cat_threshold=trial.suggest_int("max_cat_threshold", 8, 28),
+            n_estimators=trial.suggest_int("n_estimators", 50, 1000),
+            top_rate=trial.suggest_float("top_rate", 0.05, 0.45),
+            other_rate=trial.suggest_float("other_rate", 0.05, 0.45),
+            max_bin=trial.suggest_int("max_bin", 200, 300),
+            feature_fraction=trial.suggest_float("feature_fraction", 0.02, 0.1),
+            # min_gain_to_split=trial.suggest_float(
+            #     "min_gain_to_split", 1e-5, 1e-3, log=True
+            # ),
+            max_cat_threshold=trial.suggest_int("max_cat_threshold", 3, 32),
         )
         suggestion.update(self.__dict__)
         return suggestion
+
+
+@dataclass
+class FamilyLightGBMModelBaseParams:
+    lags: dict[str, int]
+    lags_future_covariates: list[int]
+    lags_past_covariates: list[str]
+    categorical_static_covariates: list[str] | None = None
+    categorical_future_covariates: list[str] | None = None
+    data_sample_strategy: str = "bagging"
+    random_state: int = 42
+    verbosity: int = -1
+    n_jobs: int = 1
+    force_row_wise: bool = True
+
+    def suggest(self, _: optuna.trial.BaseTrial) -> dict:
+        return self.__dict__
