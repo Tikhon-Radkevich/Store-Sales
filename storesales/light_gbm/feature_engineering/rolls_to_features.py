@@ -3,10 +3,10 @@ from dataclasses import dataclass
 import pandas as pd
 
 from tsfresh import extract_features
-from tsfresh.feature_extraction import MinimalFCParameters, ComprehensiveFCParameters
+from tsfresh.feature_extraction import ComprehensiveFCParameters
 from tsfresh.utilities.dataframe_functions import roll_time_series
 
-from storesales.light_gbm.param_dataclasses import ExtractFeaturesParams
+from storesales.light_gbm.feature_engineering.rolling_window_params import ExtractFeaturesParams
 
 
 @dataclass
@@ -60,41 +60,6 @@ def make_roll_features(
     features_df["store_nbr"] = features_df["store_nbr"].astype(int)
 
     return features_df
-
-
-def get_minimal_fc_parameters() -> MinimalFCParameters:
-    fc_parameters = MinimalFCParameters()
-    del fc_parameters["length"]
-    del fc_parameters["absolute_maximum"]
-    return fc_parameters
-
-
-def get_custom_minimal_fc_parameters(
-    number_peaks_n: list[int],
-    autocorrelation_lag: list[int],
-    partial_autocorrelation_lag: list[int],
-) -> MinimalFCParameters:
-    fc_parameters = MinimalFCParameters()
-    del fc_parameters["length"]
-    del fc_parameters["absolute_maximum"]
-
-    additional_features = {
-        "mean_abs_change": None,
-        "mean_change": None,
-        "longest_strike_above_mean": None,
-        "longest_strike_below_mean": None,
-        "number_peaks": [{"n": n} for n in number_peaks_n],
-        "autocorrelation": [{"lag": lag} for lag in autocorrelation_lag],
-        "partial_autocorrelation": [
-            {"lag": lag} for lag in partial_autocorrelation_lag
-        ],
-        "skewness": None,
-        "kurtosis": None,
-        "abs_energy": None,
-    }
-    fc_parameters.update(additional_features)
-
-    return fc_parameters
 
 
 def make_featured_df_from_rolls(df, rolls) -> pd.DataFrame:
