@@ -41,7 +41,8 @@ def print_models_params(lgb_models: dict[str, LightGBMModel]):
 
 
 def make_submission_predictions(
-    dataset: dict[str, FamilyDataset],
+    family_datasets: dict[str, FamilyDataset],
+    scaler,
     models: dict[str, LightGBMModel],
     horizon: int = 16,
 ) -> pd.DataFrame:
@@ -56,13 +57,15 @@ def make_submission_predictions(
     forecast_df.set_index(["date", "family", "store_nbr"], inplace=True)
     forecast_df["sales"] = None
 
-    for family, family_dataset in tqdm(dataset.items()):
+    for family, family_dataset in tqdm(family_datasets.items()):
         inputs = family_dataset.get_submission_inputs()
         pred_series = models[family].predict(n=horizon, show_warnings=False, **inputs)
 
         for store_nbr, pred in zip(family_dataset.stores, pred_series):
             pred_df = pred.pd_dataframe(copy=True)
+            pred_df["sales"] = scaler.inverse_transform_by_key(pred_df["sales"], family, store_nbr)
             pred_df[["family", "store_nbr"]] = family, store_nbr
+
             pred_df.set_index(["family", "store_nbr"], append=True, inplace=True)
             predictions.append(pred_df)
 
