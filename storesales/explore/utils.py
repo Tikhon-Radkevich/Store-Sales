@@ -4,7 +4,7 @@ import numpy as np
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
 
-from storesales.constants import START_TEST_DATE, END_TEST_DATE
+from storesales.constants import START_SUBMISSION_DATE, END_SUBMISSION_DATE
 
 
 def plot_corr_per_store(df: pd.DataFrame, title: str, reverse_yaxis: bool = False):
@@ -100,13 +100,17 @@ def get_holidays_on_sales_fig(
         )
 
     # Add vertical lines for test period
-    fig.add_vline(x=START_TEST_DATE, line_width=2, line_dash="dash", line_color="white")
-    fig.add_vline(x=END_TEST_DATE, line_width=2, line_dash="dash", line_color="white")
+    fig.add_vline(
+        x=START_SUBMISSION_DATE, line_width=2, line_dash="dash", line_color="white"
+    )
+    fig.add_vline(
+        x=END_SUBMISSION_DATE, line_width=2, line_dash="dash", line_color="white"
+    )
 
     # add annotations, x - mean of the start and end date of the test period
 
     fig.add_annotation(
-        x=pd.to_datetime(START_TEST_DATE) + pd.DateOffset(days=7),
+        x=pd.to_datetime(START_SUBMISSION_DATE) + pd.DateOffset(days=7),
         y=max(sales_df["sales"]),
         text="Test Period",
         font=dict(size=14),
