@@ -21,34 +21,31 @@ class LightGBMModelTuner:
         self.param_suggestor = param_suggestor
 
         self.studies_dict = self._initialize_studies()
-        self._show_progress_bar_dict = (
-            self._initialize_show_progress_bar()
-        )  # todo: one progress bar
 
-    def run_parallel_tune(
+    def run_tune(
         self,
         evaluate_range: pd.DatetimeIndex,
-        n_jobs: int,
         eval_stride: int = 5,
         n_trials: int = 10,
     ) -> None:
-        tuned_studies = Parallel(n_jobs=n_jobs)(
-            delayed(self._parallel_optuna_study)(
-                f, evaluate_range, eval_stride, n_trials
-            )
-            for f in self.families
-        )
-        for family, study in zip(self.families, tuned_studies):
-            self.studies_dict[family] = study
-        return
+        optuna.logging.set_verbosity(optuna.logging.WARNING)
 
-    def fit_best(self, n_jobs: int) -> dict[str, LightGBMModel]:
+        for family in self.families:
+            self.studies_dict[family].optimize(
+                lambda trial: self._objective(
+                    trial, family, evaluate_range, eval_stride
+                ),
+                n_trials=n_trials,
+                show_progress_bar=True,
+            )
+
+    def parallel_fit_best(self, n_jobs: int) -> dict[str, LightGBMModel]:
         best_models = Parallel(n_jobs=n_jobs)(
-            delayed(self._parallel_fit_best)(family) for family in self.families
+            delayed(self._fit_best)(family) for family in self.families
         )
         return dict(best_models)
 
-    def _parallel_fit_best(self, family: str) -> tuple[str, LightGBMModel]:
+    def _fit_best(self, family: str) -> tuple[str, LightGBMModel]:
         best_trial = self.studies_dict[family].best_trial
         best_params = self.param_suggestor.suggest(best_trial)
 
@@ -77,19 +74,6 @@ class LightGBMModelTuner:
 
         return objective_loss_df.values.mean()
 
-    def _parallel_optuna_study(
-        self, family: str, evaluate_range: pd.DatetimeIndex, stride: int, n_trials: int
-    ) -> optuna.Study:
-        optuna.logging.set_verbosity(optuna.logging.WARNING)
-
-        study = self.studies_dict[family]
-        study.optimize(
-            lambda trial: self._objective(trial, family, evaluate_range, stride),
-            n_trials=n_trials,
-            show_progress_bar=self._show_progress_bar_dict[family],
-        )
-        return study
-
     def _initialize_studies(self) -> dict[str, optuna.Study]:
         studies = {}
         for family in self.families:
@@ -98,10 +82,3 @@ class LightGBMModelTuner:
                 study_name=f"{family}_study",
             )
         return studies
-
-    def _initialize_show_progress_bar(self) -> dict[str, bool]:
-        show_progress_dict = {family: False for family in self.families}
-        show_progress_dict[self.families[0]] = (
-            True  # Show progress bar for one family, when run in parallel
-        )
-        return show_progress_dict
