@@ -84,7 +84,7 @@ def store_to_family_plots(
 
 def main(outer_store: bool = True) -> None:
     df = pd.read_csv(EXTERNAL_TRAIN_PATH, parse_dates=["date"])
-    pdf_file_path = os.path.join(REPORTS_PATH, "sales_plots.pdf")
+    pdf_file_path = os.path.join(REPORTS_PATH, "stores_plots.pdf")
     with PdfPages(pdf_file_path) as pdf:
         stores = sorted(df["store_nbr"].unique())
         families = df["family"].unique()
@@ -101,4 +101,4 @@ def main(outer_store: bool = True) -> None:
 
 
 if __name__ == "__main__":
-    main(outer_store=False)
+    main(outer_store=True)
