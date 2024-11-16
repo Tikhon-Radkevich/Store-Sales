@@ -23,14 +23,14 @@ class FamilyLightGBMModelParams:
 
     def suggest(self, trial: optuna.trial.BaseTrial) -> dict:
         suggestion = dict(
-            num_leaves=trial.suggest_int("num_leaves", 8, 56),
-            max_depth=trial.suggest_int("max_depth", 3, 7),
-            learning_rate=trial.suggest_float("learning_rate", 1e-3, 1e-1, log=True),
+            num_leaves=trial.suggest_int("num_leaves", 8, 144),
+            max_depth=trial.suggest_int("max_depth", 3, 14),
+            learning_rate=trial.suggest_float("learning_rate", 1e-4, 1e-1, log=True),
             n_estimators=trial.suggest_int("n_estimators", 50, 1000),
             top_rate=trial.suggest_float("top_rate", 0.05, 0.45),
             other_rate=trial.suggest_float("other_rate", 0.05, 0.45),
             max_bin=trial.suggest_int("max_bin", 200, 300),
-            feature_fraction=trial.suggest_float("feature_fraction", 0.02, 0.1),
+            feature_fraction=trial.suggest_float("feature_fraction", 0.02, 0.3),
             # min_gain_to_split=trial.suggest_float(
             #     "min_gain_to_split", 1e-5, 1e-3, log=True
             # ),
