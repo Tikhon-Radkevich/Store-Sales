@@ -42,7 +42,6 @@ def print_models_params(lgb_models: dict[str, LightGBMModel]):
 
 def make_submission_predictions(
     family_datasets: dict[str, FamilyDataset],
-    scaler,
     models: dict[str, LightGBMModel],
     horizon: int = 16,
 ) -> pd.DataFrame:
@@ -63,7 +62,7 @@ def make_submission_predictions(
 
         for store_nbr, pred in zip(family_dataset.stores, pred_series):
             pred_df = pred.pd_dataframe(copy=True)
-            pred_df["sales"] = scaler.inverse_transform_by_key(
+            pred_df["sales"] = family_dataset.scaler.inverse_transform_by_key(
                 pred_df["sales"], family, store_nbr
             )
             pred_df[["family", "store_nbr"]] = family, store_nbr
