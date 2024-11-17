@@ -63,7 +63,9 @@ def make_submission_predictions(
 
         for store_nbr, pred in zip(family_dataset.stores, pred_series):
             pred_df = pred.pd_dataframe(copy=True)
-            pred_df["sales"] = scaler.inverse_transform_by_key(pred_df["sales"], family, store_nbr)
+            pred_df["sales"] = scaler.inverse_transform_by_key(
+                pred_df["sales"], family, store_nbr
+            )
             pred_df[["family", "store_nbr"]] = family, store_nbr
 
             pred_df.set_index(["family", "store_nbr"], append=True, inplace=True)
