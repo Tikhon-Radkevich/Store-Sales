@@ -1,12 +1,15 @@
-from tqdm import tqdm
+import os
+import pickle
 
 import pandas as pd
 import numpy as np
+from tqdm import tqdm
 import matplotlib.pyplot as plt
 from darts.models import LightGBMModel
 
 from storesales.light_gbm.dataset import FamilyDataset
-from storesales.constants import START_SUBMISSION_DATE, EXTERNAL_TEST_PATH
+from storesales.light_gbm.constants import LIGHT_GBM_MODELS_DIR_PATH
+from storesales.constants import EXTERNAL_TEST_PATH
 
 
 def plot_feature_importance(lgb_model: LightGBMModel, n_top_features: int = 30):
@@ -74,3 +77,25 @@ def make_submission_predictions(
 
     forecast_df["sales"] = forecast_df["sales"].clip(lower=0)
     return forecast_df
+
+
+def load_family_lightgbm_and_dataset(family: str, dir_suffix: str = ""):
+    model_dataset_dir_path = os.path.join(LIGHT_GBM_MODELS_DIR_PATH, f"{family}{dir_suffix}")
+    model_file_path = os.path.join(model_dataset_dir_path, "model.darts")
+    family_dataset_file_path = os.path.join(model_dataset_dir_path, "family_dataset.pkl")
+
+    model = LightGBMModel.load(model_file_path)
+    with open(family_dataset_file_path, "rb") as file:
+        family_dataset = pickle.load(file)
+
+    return model, family_dataset
+
+
+def save_family_lightgbm_and_dataset(model, family_dataset, family: str, dir_suffix: str = ""):
+    model_dataset_dir_path = os.path.join(LIGHT_GBM_MODELS_DIR_PATH, f"{family}{dir_suffix}")
+    model_file_path = os.path.join(model_dataset_dir_path, "model.darts")
+    family_dataset_file_path = os.path.join(model_dataset_dir_path, "family_dataset.pkl")
+
+    model.save(model_file_path)
+    with open(family_dataset_file_path, "wb") as file:
+        pickle.dump(family_dataset, file)
