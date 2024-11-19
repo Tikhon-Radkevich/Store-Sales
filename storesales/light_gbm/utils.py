@@ -93,6 +93,8 @@ def load_family_lightgbm_and_dataset(family: str, dir_suffix: str = ""):
 
 def save_family_lightgbm_and_dataset(model, family_dataset, family: str, dir_suffix: str = ""):
     model_dataset_dir_path = os.path.join(LIGHT_GBM_MODELS_DIR_PATH, f"{family}{dir_suffix}")
+    os.mkdir(model_dataset_dir_path)
+
     model_file_path = os.path.join(model_dataset_dir_path, "model.darts")
     family_dataset_file_path = os.path.join(model_dataset_dir_path, "family_dataset.pkl")
 
