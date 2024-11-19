@@ -23,7 +23,7 @@ def get_minimal_fc_parameters() -> ComprehensiveFCParameters:
     return fc_parameters
 
 
-def get_custom_minimal_fc_parameters(
+def get_custom_fc_parameters(
     number_peaks_n: list[int],
     autocorrelation_lag: list[int],
     partial_autocorrelation_lag: list[int],
