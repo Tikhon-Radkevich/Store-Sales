@@ -1,15 +1,10 @@
 from dataclasses import dataclass
-from lightgbm import LGBMRegressor
 
 import optuna
 
 
 @dataclass
 class FamilyLightGBMModelParams:
-    # extra_trees=True,
-    # use_quantized_grad=True,
-    # early_stopping_rounds=10,
-
     lags: dict[str, int]
     lags_future_covariates: list[int]
     lags_past_covariates: list[str]
