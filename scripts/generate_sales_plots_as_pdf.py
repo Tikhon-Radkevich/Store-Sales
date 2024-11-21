@@ -1,3 +1,4 @@
+import argparse
 import warnings
 import os
 
@@ -18,32 +19,13 @@ def save_plot(
     plt.xlabel("Date")
     plt.ylabel("Sales")
     plt.xticks(rotation=45)
-
-    pdf.savefig()
-    plt.close()
-
-
-def add_content_page(stores: list, pdf: PdfPages) -> None:
-    """Adds the content page with links to each store."""
-    plt.figure(figsize=(10, 6))
-    plt.title("Table of Contents")
-    plt.axis("off")  # Turn off axes
-
-    content_text = "Table of Contents\n\n"
-    for idx, store in enumerate(stores, start=1):
-        content_text += f"{idx}. Store Number: {store}\n"
-
-    plt.text(0.5, 0.5, content_text, ha="center", va="center", wrap=True, fontsize=12)
     pdf.savefig()
     plt.close()
 
 
 def add_title_page(text: str, pdf: PdfPages) -> None:
-    """Adds a title page"""
     plt.figure(figsize=(10, 6))
-
     plt.text(0.5, 0.5, text, color="black", fontsize=44, ha="center", va="center")
-
     plt.axis("off")
     pdf.savefig()
     plt.close()
@@ -82,23 +64,41 @@ def store_to_family_plots(
             save_plot(store, family, store_family_data, pdf)
 
 
-def main(outer_store: bool = True) -> None:
+def main(grouping_type: str) -> None:
     df = pd.read_csv(EXTERNAL_TRAIN_PATH, parse_dates=["date"])
-    pdf_file_path = os.path.join(REPORTS_PATH, "stores_plots.pdf")
+
+    pdf_file_path = os.path.join(
+        REPORTS_PATH, f"{'stores' if grouping_type == 'store' else 'families'}_plots.pdf"
+    )
+
     with PdfPages(pdf_file_path) as pdf:
         stores = sorted(df["store_nbr"].unique())
         families = df["family"].unique()
 
-        if outer_store:
+        if grouping_type == "store":
             outer = stores
             inner = families
-        else:
+            add_title_page("Store-Based Grouping", pdf)
+        elif grouping_type == "family":
             outer = families
             inner = stores
+            add_title_page("Family-Based Grouping", pdf)
+        else:
+            raise ValueError("Invalid grouping type. Use 'store' or 'family'.")
 
-        # add_content_page(stores, pdf)
-        store_to_family_plots(df, outer, inner, pdf, outer_store)
+        store_to_family_plots(df, outer, inner, pdf, grouping_type == "store")
+
+    print(f"Plots saved to: {pdf_file_path}")
 
 
 if __name__ == "__main__":
-    main(outer_store=True)
+    parser = argparse.ArgumentParser(description="Generate sales plots grouped by store or family.")
+    parser.add_argument(
+        "grouping_type",
+        type=str,
+        choices=["store", "family"],
+        help="Grouping type: 'store' to group by store, 'family' to group by family."
+    )
+    args = parser.parse_args()
+
+    main(args.grouping_type)
