@@ -95,6 +95,8 @@ def evaluate(
         family_losses_df = pd.concat(family_losses, axis=1)
         return family_losses_df
 
-    losses = Parallel(n_jobs=n_jobs)(delayed(evaluate_family)(f) for f in tqdm(models.keys()))
+    losses = Parallel(n_jobs=n_jobs)(
+        delayed(evaluate_family)(f) for f in tqdm(models.keys())
+    )
 
     return pd.concat(losses)
