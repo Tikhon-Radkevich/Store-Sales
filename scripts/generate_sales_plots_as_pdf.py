@@ -68,7 +68,8 @@ def main(grouping_type: str) -> None:
     df = pd.read_csv(EXTERNAL_TRAIN_PATH, parse_dates=["date"])
 
     pdf_file_path = os.path.join(
-        REPORTS_PATH, f"{'stores' if grouping_type == 'store' else 'families'}_plots.pdf"
+        REPORTS_PATH,
+        f"{'stores' if grouping_type == 'store' else 'families'}_plots.pdf",
     )
 
     with PdfPages(pdf_file_path) as pdf:
@@ -92,12 +93,14 @@ def main(grouping_type: str) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate sales plots grouped by store or family.")
+    parser = argparse.ArgumentParser(
+        description="Generate sales plots grouped by store or family."
+    )
     parser.add_argument(
         "grouping_type",
         type=str,
         choices=["store", "family"],
-        help="Grouping type: 'store' to group by store, 'family' to group by family."
+        help="Grouping type: 'store' to group by store, 'family' to group by family.",
     )
     args = parser.parse_args()
 
