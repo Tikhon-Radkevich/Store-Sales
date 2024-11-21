@@ -29,6 +29,8 @@ class AdvancedPredictor:
         self.lightgbm_model_prediction_df = lightgbm_model_prediction_df
         self.lightgbm_model_name = lightgbm_model_name
 
+        self.min_loss_ids = None
+
         self._baseline_models = self._load_baseline_models()
         self._baseline_losses = self._load_baseline_losses()
 
@@ -39,6 +41,39 @@ class AdvancedPredictor:
         self._combined_prediction = self._get_combined_prediction()
 
         self._loss_to_choose_model_df, self._test_loss_df = self._split_loss()
+
+    def make_model_selection_plot(self):
+        """
+        Create a bar plot showing the number of times each model is selected
+        for each family based on the minimum loss.
+        """
+        # Extract family and model from self.min_loss_ids
+        selection_counts = (
+            self.min_loss_ids.to_frame(index=False)
+            .groupby(["family", "model"])
+            .size()
+            .reset_index(name="count")
+        )
+
+        # Pivot for easier plotting
+        selection_pivot = selection_counts.pivot(
+            index="family", columns="model", values="count"
+        ).fillna(0)
+
+        # Plot
+        palette = sns.color_palette(
+            "dark:#5A9_r", n_colors=len(selection_pivot.columns)
+        )
+        selection_pivot.plot(kind="bar", width=0.7, color=palette, figsize=(20, 10))
+
+        plt.title("Number of Models Selected per Family", fontsize=18)
+        plt.xlabel("Family", fontsize=16)
+        plt.ylabel("Selection Count", fontsize=16)
+        plt.legend(title="Model", fontsize=16, title_fontsize=16)
+        plt.xticks(fontsize=16, rotation=90)
+        plt.yticks(fontsize=16)
+        plt.tight_layout()
+        plt.show()
 
     def _split_loss(self):
         split_index = self._combined_loss.columns.get_loc(self.loss_split_date_str)
@@ -61,15 +96,30 @@ class AdvancedPredictor:
         return self._loss_to_choose_model_df.mean(axis=1).rename("loss").reset_index()
 
     def get_optimal_prediction(
-        self, models: list[str] = None, lightgbm_drop_families: list[str] = None
+        self,
+        models: list[str] = None,
+        lightgbm_drop_families: list[str] = None,
+        select_by_family: bool = False,
     ):
+        """
+        Get optimal predictions based on minimum loss.
+
+        Args:
+            models (list[str]): List of models to consider for selection. Default is None (consider all models).
+            lightgbm_drop_families (list[str]): List of families to exclude from LightGBM selection. Default is None.
+            select_by_family (bool): If True, select the best model for the entire family; otherwise, select for each store-family combination.
+        """
         combined_loss = self._loss_to_choose_model_df.copy()
+
+        # Filter models if specified
         if models is not None:
             model_condition = combined_loss.index.get_level_values("model").isin(models)
             combined_loss = combined_loss[model_condition]
 
+        # Calculate mean loss across time
         family_store_mean_loss = combined_loss.mean(axis=1).rename("loss")
 
+        # Adjust LightGBM losses for specific families if specified
         if lightgbm_drop_families is not None:
             family_con = family_store_mean_loss.index.get_level_values("family").isin(
                 lightgbm_drop_families
@@ -80,8 +130,18 @@ class AdvancedPredictor:
             )
             family_store_mean_loss[family_con & model_con] = float("inf")
 
+        if select_by_family:
+            # todo: upgrade selection by family.
+            family_store_mean_loss = family_store_mean_loss.groupby(
+                ["model", "family"]
+            ).transform("mean")
+
         min_loss_ids = family_store_mean_loss.groupby(["family", "store_nbr"]).idxmin()
-        return self._combined_prediction.loc[min_loss_ids].copy()
+        self.min_loss_ids = pd.MultiIndex.from_tuples(
+            min_loss_ids, names=["model", "family", "store_nbr"]
+        )
+
+        return self._combined_prediction.loc[self.min_loss_ids].copy()
 
     def make_family_loss_plot(self, family: str, test_loss: bool = True):
         if test_loss:
