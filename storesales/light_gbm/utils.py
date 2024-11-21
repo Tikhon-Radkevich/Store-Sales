@@ -80,6 +80,8 @@ def make_submission_predictions(
 
 
 def load_family_lightgbm_and_dataset(family: str, dir_suffix: str = ""):
+    if "/" in family:
+        family = family.replace("/", "_")
     model_dataset_dir_path = os.path.join(LIGHT_GBM_MODELS_DIR_PATH, f"{family}{dir_suffix}")
     model_file_path = os.path.join(model_dataset_dir_path, "model.darts")
     family_dataset_file_path = os.path.join(model_dataset_dir_path, "family_dataset.pkl")
@@ -92,8 +94,11 @@ def load_family_lightgbm_and_dataset(family: str, dir_suffix: str = ""):
 
 
 def save_family_lightgbm_and_dataset(model, family_dataset, family: str, dir_suffix: str = ""):
+    if "/" in family:
+        family = family.replace("/", "_")
     model_dataset_dir_path = os.path.join(LIGHT_GBM_MODELS_DIR_PATH, f"{family}{dir_suffix}")
-    os.mkdir(model_dataset_dir_path)
+    if not os.path.exists(model_dataset_dir_path):
+        os.mkdir(model_dataset_dir_path)
 
     model_file_path = os.path.join(model_dataset_dir_path, "model.darts")
     family_dataset_file_path = os.path.join(model_dataset_dir_path, "family_dataset.pkl")
