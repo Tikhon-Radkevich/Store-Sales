@@ -13,11 +13,9 @@ class LightGBMModelTuner:
     def __init__(
         self,
         family_datasets: dict[str, FamilyDataset],
-        families: list[str],
         param_suggestor: FamilyLightGBMModelParams,
     ):
         self.family_datasets = family_datasets
-        self.families = families
         self.param_suggestor = param_suggestor
 
         self.studies_dict = self._initialize_studies()
@@ -30,7 +28,9 @@ class LightGBMModelTuner:
     ) -> None:
         optuna.logging.set_verbosity(optuna.logging.WARNING)
 
-        for family in self.families:
+        for family in self.family_datasets.keys():
+            print(f"Optimizing {family} model...")
+
             self.studies_dict[family].optimize(
                 lambda trial: self._objective(
                     trial, family, evaluate_range, eval_stride
@@ -41,7 +41,7 @@ class LightGBMModelTuner:
 
     def parallel_fit_best(self, n_jobs: int) -> dict[str, LightGBMModel]:
         best_models = Parallel(n_jobs=n_jobs)(
-            delayed(self._fit_best)(family) for family in self.families
+            delayed(self._fit_best)(family) for family in self.family_datasets.keys()
         )
         return dict(best_models)
 
@@ -76,7 +76,7 @@ class LightGBMModelTuner:
 
     def _initialize_studies(self) -> dict[str, optuna.Study]:
         studies = {}
-        for family in self.families:
+        for family in self.family_datasets.keys():
             studies[family] = optuna.create_study(
                 direction="minimize",
                 study_name=f"{family}_study",
