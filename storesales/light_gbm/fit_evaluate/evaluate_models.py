@@ -1,6 +1,7 @@
 from joblib import Parallel, delayed
 
 import pandas as pd
+from tqdm import tqdm
 from darts.models import RegressionModel
 
 from storesales.loss import clipped_rmsle
@@ -60,7 +61,7 @@ def evaluate(
     models: dict[str, RegressionModel],
     evaluate_range: pd.DatetimeIndex,
     stride=1,
-    parallel=False,
+    n_jobs=1,
 ) -> pd.DataFrame:
     def evaluate_family(family: str) -> pd.DataFrame:
         scaler = dataset[family].scaler
@@ -94,9 +95,6 @@ def evaluate(
         family_losses_df = pd.concat(family_losses, axis=1)
         return family_losses_df
 
-    if parallel:
-        losses = Parallel(n_jobs=-1)(delayed(evaluate_family)(f) for f in models.keys())
-    else:
-        losses = [evaluate_family(f) for f in models.keys()]
+    losses = Parallel(n_jobs=n_jobs)(delayed(evaluate_family)(f) for f in tqdm(models.keys()))
 
     return pd.concat(losses)
