@@ -99,24 +99,21 @@ class AdvancedPredictor:
             transformed_mean_loss = grouped_loss.transform("mean")
             return transformed_mean_loss.groupby(["family", "store_nbr"]).idxmin()
 
-        def combine_strategies(first_strategy_ids, second_strategy_ids):
-            first_strategy_loss = calc_mean_test_loss(first_strategy_ids)
-            second_strategy_loss = calc_mean_test_loss(second_strategy_ids)
+        def combine_strategies(strategies_ids):
+            strategies_losses = [calc_mean_test_loss(ids) for ids in strategies_ids]
 
-            mask = first_strategy_loss < second_strategy_loss
-            better_strategy = pd.Series(mask, name="use_first")
+            stacked_losses = pd.concat(strategies_losses, axis=1).stack().rename("loss")
+            stacked_losses = stacked_losses.rename_axis(["family", "i_strategy"])
 
-            optimal_indices = np.concatenate(
-                [
-                    first_strategy_ids[family].values
-                    if better_strategy.loc[family]
-                    else second_strategy_ids[family].values
-                    for family in better_strategy.index
-                ]
-            )
+            min_indices = stacked_losses.groupby("family").idxmin()
+
+            optimal_indices = [
+                strategies_ids[i_strategy][family].values
+                for family, i_strategy in min_indices.values
+            ]
 
             return pd.MultiIndex.from_tuples(
-                optimal_indices, names=["model", "family", "store_nbr"]
+                np.concatenate(optimal_indices), names=["model", "family", "store_nbr"]
             )
 
         combined_loss = self.filter_combined_loss(
@@ -138,10 +135,17 @@ class AdvancedPredictor:
             return get_mean_family_strategy_min_ids(family_store_mean_loss)
 
         elif strategy == "combined":
-            each_store_strategy_min_ids = get_each_store_strategy_min_ids(family_store_mean_loss)
-            mean_family_strategy_min_ids = get_mean_family_strategy_min_ids(family_store_mean_loss)
-
-            return combine_strategies(each_store_strategy_min_ids, mean_family_strategy_min_ids)
+            each_store_strategy_min_ids = get_each_store_strategy_min_ids(
+                family_store_mean_loss
+            )
+            mean_family_strategy_min_ids = get_mean_family_strategy_min_ids(
+                family_store_mean_loss
+            )
+            strategies_min_ids = [
+                each_store_strategy_min_ids,
+                mean_family_strategy_min_ids,
+            ]
+            return combine_strategies(strategies_min_ids)
 
         else:
             raise ValueError(f"Invalid strategy. Choose from {strategies}")
