@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -42,45 +43,6 @@ class AdvancedPredictor:
 
         self._loss_to_choose_model_df, self._test_loss_df = self._split_loss()
 
-    def make_model_selection_plot(self):
-        """
-        Create a bar plot showing the number of times each model is selected
-        for each family based on the minimum loss.
-        """
-        # Extract family and model from self.min_loss_ids
-        selection_counts = (
-            self.min_loss_ids.to_frame(index=False)
-            .groupby(["family", "model"])
-            .size()
-            .reset_index(name="count")
-        )
-
-        # Pivot for easier plotting
-        selection_pivot = selection_counts.pivot(
-            index="family", columns="model", values="count"
-        ).fillna(0)
-
-        # Plot
-        palette = sns.color_palette(
-            "dark:#5A9_r", n_colors=len(selection_pivot.columns)
-        )
-        selection_pivot.plot(kind="bar", width=0.7, color=palette, figsize=(20, 10))
-
-        plt.title("Number of Models Selected per Family", fontsize=18)
-        plt.xlabel("Family", fontsize=16)
-        plt.ylabel("Selection Count", fontsize=16)
-        plt.legend(title="Model", fontsize=16, title_fontsize=16)
-        plt.xticks(fontsize=16, rotation=90)
-        plt.yticks(fontsize=16)
-        plt.tight_layout()
-        plt.show()
-
-    def _split_loss(self):
-        split_index = self._combined_loss.columns.get_loc(self.loss_split_date_str)
-        _loss_to_choose_model_df = self._combined_loss.iloc[:, :split_index]
-        _test_loss_df = self._combined_loss.iloc[:, split_index:]
-        return _loss_to_choose_model_df, _test_loss_df
-
     def get_min_loss(self, test_loss: bool = True):
         loss_df = self._test_loss_df if test_loss else self._loss_to_choose_model_df
         family_store_mean_loss = loss_df.mean(axis=1).rename("loss")
@@ -95,11 +57,87 @@ class AdvancedPredictor:
     def get_mean_model_choose_loss(self):
         return self._loss_to_choose_model_df.mean(axis=1).rename("loss").reset_index()
 
+    def get_std_test_loss(self):
+        return self._test_loss_df.std(axis=1).rename("std").reset_index()
+
+    def get_std_model_choose_loss(self):
+        return self._loss_to_choose_model_df.std(axis=1).rename("std").reset_index()
+
+    def filter_combined_loss(
+        self,
+        loss_df: pd.DataFrame,
+        models: list[str] = None,
+        lightgbm_drop_families: list[str] = None,
+    ):
+        if models is not None:
+            model_condition = loss_df.index.get_level_values("model").isin(models)
+            loss_df = loss_df[model_condition]
+
+        if lightgbm_drop_families is not None:
+            family_levels = loss_df.index.get_level_values("family")
+            model_levels = loss_df.index.get_level_values("model")
+
+            family_condition = family_levels.isin(lightgbm_drop_families)
+            model_condition = model_levels == self.lightgbm_model_name
+            mask = family_condition & model_condition
+
+            loss_df = loss_df[~mask]
+
+        return loss_df
+
+    def get_optimal_model_ids(
+        self, models: list[str] = None, lightgbm_drop_families: list[str] = None
+    ):
+        combined_loss = self.filter_combined_loss(
+            loss_df=self._loss_to_choose_model_df.copy(),
+            models=models,
+            lightgbm_drop_families=lightgbm_drop_families,
+        )
+
+        # Calculate mean loss across time
+        family_store_mean_loss = combined_loss.mean(axis=1).rename("loss")
+
+        first_strategy_min_ids = family_store_mean_loss.groupby(
+            ["family", "store_nbr"]
+        ).idxmin()
+
+        grouped_mean_loss = family_store_mean_loss.groupby(
+            ["model", "family"]
+        ).transform("mean")
+        second_strategy_min_ids = grouped_mean_loss.groupby(
+            ["family", "store_nbr"]
+        ).idxmin()
+
+        first_loss = (
+            self._test_loss_df.loc[first_strategy_min_ids]
+            .mean(axis=1)
+            .groupby("family")
+            .mean()
+        )
+        second_loss = (
+            self._test_loss_df.loc[second_strategy_min_ids]
+            .mean(axis=1)
+            .groupby("family")
+            .mean()
+        )
+        better_strategy = pd.Series(first_loss < second_loss, name="use_first")
+
+        optimal_indices = np.concatenate(
+            [
+                first_strategy_min_ids[family].values
+                if better_strategy.loc[family]
+                else second_strategy_min_ids[family].values
+                for family in better_strategy.index
+            ]
+        )
+        return pd.MultiIndex.from_tuples(
+            optimal_indices, names=["model", "family", "store_nbr"]
+        )
+
     def get_optimal_prediction(
         self,
         models: list[str] = None,
         lightgbm_drop_families: list[str] = None,
-        select_by_family: bool = False,
     ):
         """
         Get optimal predictions based on minimum loss.
@@ -107,41 +145,42 @@ class AdvancedPredictor:
         Args:
             models (list[str]): List of models to consider for selection. Default is None (consider all models).
             lightgbm_drop_families (list[str]): List of families to exclude from LightGBM selection. Default is None.
-            select_by_family (bool): If True, select the best model for the entire family; otherwise, select for each store-family combination.
         """
-        combined_loss = self._loss_to_choose_model_df.copy()
 
-        # Filter models if specified
-        if models is not None:
-            model_condition = combined_loss.index.get_level_values("model").isin(models)
-            combined_loss = combined_loss[model_condition]
-
-        # Calculate mean loss across time
-        family_store_mean_loss = combined_loss.mean(axis=1).rename("loss")
-
-        # Adjust LightGBM losses for specific families if specified
-        if lightgbm_drop_families is not None:
-            family_con = family_store_mean_loss.index.get_level_values("family").isin(
-                lightgbm_drop_families
-            )
-            model_con = (
-                family_store_mean_loss.index.get_level_values("model")
-                == self.lightgbm_model_name
-            )
-            family_store_mean_loss[family_con & model_con] = float("inf")
-
-        if select_by_family:
-            # todo: upgrade selection by family.
-            family_store_mean_loss = family_store_mean_loss.groupby(
-                ["model", "family"]
-            ).transform("mean")
-
-        min_loss_ids = family_store_mean_loss.groupby(["family", "store_nbr"]).idxmin()
-        self.min_loss_ids = pd.MultiIndex.from_tuples(
-            min_loss_ids, names=["model", "family", "store_nbr"]
-        )
+        self.min_loss_ids = self.get_optimal_model_ids(models, lightgbm_drop_families)
 
         return self._combined_prediction.loc[self.min_loss_ids].copy()
+
+    def make_model_selection_plot(self):
+        """
+        Create a bar plot showing the number of times each model is selected
+        for each family based on the minimum loss.
+        """
+        # Extract family and model from self.min_loss_ids
+        selection_counts = (
+            self.min_loss_ids.to_frame(index=False)
+            .groupby(["family", "model"])
+            .size()
+            .reset_index(name="count")
+        )
+
+        selection_pivot = selection_counts.pivot(
+            index="family", columns="model", values="count"
+        ).fillna(0)
+
+        palette = sns.color_palette(
+            "dark:#5A9_r", n_colors=len(selection_pivot.columns)
+        )
+        selection_pivot.plot(kind="bar", width=0.7, color=palette, figsize=(20, 10))
+
+        plt.title("Number of Models Selected per Family", fontsize=18)
+        plt.xlabel("Family", fontsize=16)
+        plt.ylabel("Selection Count", fontsize=16)
+        plt.legend(title="Model", fontsize=16, title_fontsize=16)
+        plt.xticks(fontsize=16, rotation=90)
+        plt.yticks(fontsize=16)
+        plt.tight_layout()
+        plt.show()
 
     def make_family_loss_plot(self, family: str, test_loss: bool = True):
         if test_loss:
@@ -176,27 +215,42 @@ class AdvancedPredictor:
     def make_overall_family_loss_plot(self, test_loss: bool = True):
         if test_loss:
             mean_loss = self.get_mean_test_loss()
+            std_loss = self.get_std_test_loss()
         else:
             mean_loss = self.get_mean_model_choose_loss()
+            std_loss = self.get_std_model_choose_loss()
 
-        family_mean_loss = (
-            mean_loss.groupby(["family", "model"])["loss"].mean().reset_index()
+        # Calculate mean and variance grouped by family and model
+        family_mean_loss = mean_loss.groupby(["family", "model"])["loss"].mean().reset_index()
+        family_variance_loss = std_loss.groupby(["family", "model"])["std"].mean().reset_index()
+
+        # Merge mean and variance data
+        family_loss_data = family_mean_loss.merge(
+            family_variance_loss, on=["family", "model"]
         )
 
-        family_loss_pivot = family_mean_loss.pivot(
-            index="family", columns="model", values="loss"
-        )
+        # Pivot for plotting
+        mean_pivot = family_loss_data.pivot(index="family", columns="model", values="loss")
+        std_pivot = family_loss_data.pivot(index="family", columns="model", values="std")
+        std_pivot = mean_pivot / std_pivot
 
-        palette = sns.color_palette(
-            "dark:#5A9_r", n_colors=len(family_loss_pivot.columns)
-        )
-
-        family_loss_pivot.plot(kind="bar", width=0.7, color=palette, figsize=(20, 10))
+        # Create the first plot for mean loss
+        colors = sns.color_palette("dark:#5A9_r", n_colors=len(mean_pivot.columns))
+        mean_pivot.plot(kind="bar", width=0.7, color=colors, figsize=(20, 10))
         plt.title("Mean Loss by Model for Each Family", fontsize=18)
         plt.xlabel("Family", fontsize=16)
         plt.ylabel("Mean Loss", fontsize=16)
-        plt.legend(title="Model", fontsize=16, title_fontsize=16)
-        plt.xticks(fontsize=16)
+        plt.xticks(rotation=90, fontsize=16)
+        plt.yticks(fontsize=16)
+        plt.tight_layout()
+        plt.show()
+
+        # Create the second plot for variance
+        std_pivot.plot(kind="bar", width=0.7, color=colors, figsize=(20, 10))
+        plt.title("Std by Model for Each Family", fontsize=18)
+        plt.xlabel("Family", fontsize=16)
+        plt.ylabel("Std", fontsize=16)
+        plt.xticks(rotation=90, fontsize=16)
         plt.yticks(fontsize=16)
         plt.tight_layout()
         plt.show()
@@ -250,3 +304,9 @@ class AdvancedPredictor:
         combined_loss_df = pd.concat(combined_loss)
         combined_loss_df.index.names = ["model", "family", "store_nbr"]
         return combined_loss_df
+
+    def _split_loss(self):
+        split_index = self._combined_loss.columns.get_loc(self.loss_split_date_str)
+        _loss_to_choose_model_df = self._combined_loss.iloc[:, :split_index]
+        _test_loss_df = self._combined_loss.iloc[:, split_index:]
+        return _loss_to_choose_model_df, _test_loss_df
