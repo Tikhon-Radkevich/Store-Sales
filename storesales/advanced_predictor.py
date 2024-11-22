@@ -51,17 +51,9 @@ class AdvancedPredictor:
         )
         return min_loss_mean
 
-    def get_mean_test_loss(self):
-        return self._test_loss_df.mean(axis=1).rename("loss").reset_index()
-
-    def get_mean_model_choose_loss(self):
-        return self._loss_to_choose_model_df.mean(axis=1).rename("loss").reset_index()
-
-    def get_std_test_loss(self):
-        return self._test_loss_df.std(axis=1).rename("std").reset_index()
-
-    def get_std_model_choose_loss(self):
-        return self._loss_to_choose_model_df.std(axis=1).rename("std").reset_index()
+    def calc_mean_loss(self, indices: pd.MultiIndex, test_loss: bool = True):
+        loss_df = self._test_loss_df if test_loss else self._loss_to_choose_model_df
+        return loss_df.loc[indices].mean(axis=1).groupby("family").mean()
 
     def filter_combined_loss(
         self,
@@ -86,8 +78,47 @@ class AdvancedPredictor:
         return loss_df
 
     def get_optimal_model_ids(
-        self, models: list[str] = None, lightgbm_drop_families: list[str] = None
+        self,
+        models: list[str] = None,
+        lightgbm_drop_families: list[str] = None,
+        strategy: str = "each_store",
+        use_std: bool = False,
     ):
+        strategies = ("each_store", "mean_family", "combined")
+        if strategy not in strategies:
+            raise ValueError(f"Invalid strategy. Choose from {strategies}")
+
+        def calc_mean_test_loss(indices: pd.MultiIndex):
+            return self._test_loss_df.loc[indices].mean(axis=1).groupby("family").mean()
+
+        def get_each_store_strategy_min_ids(loss_df):
+            return loss_df.groupby(["family", "store_nbr"]).idxmin()
+
+        def get_mean_family_strategy_min_ids(loss_df):
+            grouped_loss = loss_df.groupby(["model", "family"])
+            transformed_mean_loss = grouped_loss.transform("mean")
+            return transformed_mean_loss.groupby(["family", "store_nbr"]).idxmin()
+
+        def combine_strategies(first_strategy_ids, second_strategy_ids):
+            first_strategy_loss = calc_mean_test_loss(first_strategy_ids)
+            second_strategy_loss = calc_mean_test_loss(second_strategy_ids)
+
+            mask = first_strategy_loss < second_strategy_loss
+            better_strategy = pd.Series(mask, name="use_first")
+
+            optimal_indices = np.concatenate(
+                [
+                    first_strategy_ids[family].values
+                    if better_strategy.loc[family]
+                    else second_strategy_ids[family].values
+                    for family in better_strategy.index
+                ]
+            )
+
+            return pd.MultiIndex.from_tuples(
+                optimal_indices, names=["model", "family", "store_nbr"]
+            )
+
         combined_loss = self.filter_combined_loss(
             loss_df=self._loss_to_choose_model_df.copy(),
             models=models,
@@ -97,57 +128,67 @@ class AdvancedPredictor:
         # Calculate mean loss across time
         family_store_mean_loss = combined_loss.mean(axis=1).rename("loss")
 
-        first_strategy_min_ids = family_store_mean_loss.groupby(
-            ["family", "store_nbr"]
-        ).idxmin()
+        if use_std:
+            family_store_mean_loss *= combined_loss.std(axis=1)
 
-        grouped_mean_loss = family_store_mean_loss.groupby(
-            ["model", "family"]
-        ).transform("mean")
-        second_strategy_min_ids = grouped_mean_loss.groupby(
-            ["family", "store_nbr"]
-        ).idxmin()
+        if strategy == "each_store":
+            return get_each_store_strategy_min_ids(family_store_mean_loss)
 
-        first_loss = (
-            self._test_loss_df.loc[first_strategy_min_ids]
+        elif strategy == "mean_family":
+            return get_mean_family_strategy_min_ids(family_store_mean_loss)
+
+        elif strategy == "combined":
+            each_store_strategy_min_ids = get_each_store_strategy_min_ids(family_store_mean_loss)
+            mean_family_strategy_min_ids = get_mean_family_strategy_min_ids(family_store_mean_loss)
+
+            return combine_strategies(each_store_strategy_min_ids, mean_family_strategy_min_ids)
+
+        else:
+            raise ValueError(f"Invalid strategy. Choose from {strategies}")
+
+    def get_loss_comparison(self, test_loss: bool = True, use_std: bool = False):
+        each_store_strategy_ids = self.get_optimal_model_ids(
+            strategy="each_store", use_std=use_std
+        )
+        mean_family_strategy_ids = self.get_optimal_model_ids(
+            strategy="mean_family", use_std=use_std
+        )
+
+        loss_df = self._test_loss_df if test_loss else self._loss_to_choose_model_df
+
+        each_store_strategy_loss = (
+            loss_df.loc[each_store_strategy_ids]
             .mean(axis=1)
             .groupby("family")
             .mean()
+            .rename("each_store")
         )
-        second_loss = (
-            self._test_loss_df.loc[second_strategy_min_ids]
+        mean_family_strategy_loss = (
+            loss_df.loc[mean_family_strategy_ids]
             .mean(axis=1)
             .groupby("family")
             .mean()
+            .rename("mean_family")
         )
-        better_strategy = pd.Series(first_loss < second_loss, name="use_first")
-
-        optimal_indices = np.concatenate(
-            [
-                first_strategy_min_ids[family].values
-                if better_strategy.loc[family]
-                else second_strategy_min_ids[family].values
-                for family in better_strategy.index
-            ]
+        total_df = pd.concat(
+            [each_store_strategy_loss, mean_family_strategy_loss], axis=1
         )
-        return pd.MultiIndex.from_tuples(
-            optimal_indices, names=["model", "family", "store_nbr"]
-        )
+        return total_df.stack().rename_axis(["family", "strategy"]).rename("loss")
 
     def get_optimal_prediction(
         self,
         models: list[str] = None,
         lightgbm_drop_families: list[str] = None,
+        strategy: str = "each_store",
+        use_std: bool = False,
     ):
         """
         Get optimal predictions based on minimum loss.
-
-        Args:
-            models (list[str]): List of models to consider for selection. Default is None (consider all models).
-            lightgbm_drop_families (list[str]): List of families to exclude from LightGBM selection. Default is None.
         """
 
-        self.min_loss_ids = self.get_optimal_model_ids(models, lightgbm_drop_families)
+        self.min_loss_ids = self.get_optimal_model_ids(
+            models, lightgbm_drop_families, strategy, use_std
+        )
 
         return self._combined_prediction.loc[self.min_loss_ids].copy()
 
@@ -183,10 +224,8 @@ class AdvancedPredictor:
         plt.show()
 
     def make_family_loss_plot(self, family: str, test_loss: bool = True):
-        if test_loss:
-            mean_loss = self.get_mean_test_loss()
-        else:
-            mean_loss = self.get_mean_model_choose_loss()
+        loss_df = self._test_loss_df if test_loss else self._loss_to_choose_model_df
+        mean_loss = loss_df.mean(axis=1).rename("loss").reset_index()
 
         family_store_mean_loss = mean_loss.reset_index()
         family_store_mean_loss = family_store_mean_loss[
@@ -212,27 +251,36 @@ class AdvancedPredictor:
         plt.tight_layout()
         plt.show()
 
-    def make_overall_family_loss_plot(self, test_loss: bool = True):
-        if test_loss:
-            mean_loss = self.get_mean_test_loss()
-            std_loss = self.get_std_test_loss()
-        else:
-            mean_loss = self.get_mean_model_choose_loss()
-            std_loss = self.get_std_model_choose_loss()
+    def make_overall_family_loss_plot(
+        self, families: list[str] = None, test_loss: bool = True
+    ):
+        loss_df = self._test_loss_df if test_loss else self._loss_to_choose_model_df
+        loss_df = loss_df[loss_df.index.get_level_values("family").isin(families)]
+
+        mean_loss = loss_df.mean(axis=1).rename("loss").reset_index()
+        std_loss = loss_df.std(axis=1).rename("std").reset_index()
 
         # Calculate mean and variance grouped by family and model
-        family_mean_loss = mean_loss.groupby(["family", "model"])["loss"].mean().reset_index()
-        family_variance_loss = std_loss.groupby(["family", "model"])["std"].mean().reset_index()
+        family_mean_loss = (
+            mean_loss.groupby(["family", "model"])["loss"].mean().reset_index()
+        )
+        family_variance_loss = (
+            std_loss.groupby(["family", "model"])["std"].mean().reset_index()
+        )
 
         # Merge mean and variance data
-        family_loss_data = family_mean_loss.merge(
+        family_loss_data: pd.DataFrame = family_mean_loss.merge(
             family_variance_loss, on=["family", "model"]
         )
 
         # Pivot for plotting
-        mean_pivot = family_loss_data.pivot(index="family", columns="model", values="loss")
-        std_pivot = family_loss_data.pivot(index="family", columns="model", values="std")
-        std_pivot = mean_pivot / std_pivot
+        mean_pivot = family_loss_data.pivot(
+            index="family", columns="model", values="loss"
+        )
+        std_pivot = family_loss_data.pivot(
+            index="family", columns="model", values="std"
+        )
+        # std_pivot *= mean_pivot
 
         # Create the first plot for mean loss
         colors = sns.color_palette("dark:#5A9_r", n_colors=len(mean_pivot.columns))
