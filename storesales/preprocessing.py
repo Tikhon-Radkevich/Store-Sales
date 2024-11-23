@@ -57,7 +57,10 @@ def interpolate_missing_sales(group: pd.DataFrame) -> pd.DataFrame:
 
 
 def preprocess(
-    df: pd.DataFrame, zero_gap_size_to_replace=10, remove_zero_gaps=True
+    df: pd.DataFrame,
+    zero_gap_size_to_replace=10,
+    make_zero_gaps_replacing=True,
+    make_interpolation=True,
 ) -> pd.DataFrame:
     """
     Transformation:
@@ -78,17 +81,18 @@ def preprocess(
         .reset_index(level=["store_nbr", "family"])
     )
 
-    if remove_zero_gaps:
+    if make_zero_gaps_replacing:
         df = (
             df.groupby(["store_nbr", "family"])
             .apply(replace_zero_gaps, zero_gap_size_to_replace, include_groups=False)
             .reset_index(level=["store_nbr", "family"])
         )
 
-    df = (
-        df.groupby(["store_nbr", "family"])
-        .apply(interpolate_missing_sales, include_groups=False)
-        .reset_index(level=["store_nbr", "family"])
-    )
+    if make_interpolation:
+        df = (
+            df.groupby(["store_nbr", "family"])
+            .apply(interpolate_missing_sales, include_groups=False)
+            .reset_index(level=["store_nbr", "family"])
+        )
 
     return df
