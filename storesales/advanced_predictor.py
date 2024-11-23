@@ -82,39 +82,48 @@ class AdvancedPredictor:
         models: list[str] = None,
         lightgbm_drop_families: list[str] = None,
         strategy: str = "each_store",
-        use_std: bool = False,
-    ):
+        use_std: bool = False,  # todo: remove
+    ) -> pd.MultiIndex:
         strategies = ("each_store", "mean_family", "combined")
         if strategy not in strategies:
             raise ValueError(f"Invalid strategy. Choose from {strategies}")
 
-        def calc_mean_test_loss(indices: pd.MultiIndex):
+        def get_multiindex(indices: list) -> pd.MultiIndex:
+            return pd.MultiIndex.from_tuples(
+                indices, names=["model", "family", "store_nbr"]
+            )
+
+        def calc_mean_test_loss(indices: pd.MultiIndex) -> pd.Series:
             return self._test_loss_df.loc[indices].mean(axis=1).groupby("family").mean()
 
-        def get_each_store_strategy_min_ids(loss_df):
-            return loss_df.groupby(["family", "store_nbr"]).idxmin()
+        def get_each_store_strategy_min_ids(loss_df: pd.Series) -> pd.MultiIndex:
+            idx_min_series = loss_df.groupby(["family", "store_nbr"]).idxmin()
+            return get_multiindex(idx_min_series.values)
 
-        def get_mean_family_strategy_min_ids(loss_df):
+        def get_mean_family_strategy_min_ids(loss_df: pd.Series) -> pd.MultiIndex:
             grouped_loss = loss_df.groupby(["model", "family"])
             transformed_mean_loss = grouped_loss.transform("mean")
-            return transformed_mean_loss.groupby(["family", "store_nbr"]).idxmin()
+            idx_min_series = transformed_mean_loss.groupby(
+                ["family", "store_nbr"]
+            ).idxmin()
+            return get_multiindex(idx_min_series.values)
 
-        def combine_strategies(strategies_ids):
+        def combine_strategies(strategies_ids: list[pd.MultiIndex]) -> pd.MultiIndex:
             strategies_losses = [calc_mean_test_loss(ids) for ids in strategies_ids]
 
             stacked_losses = pd.concat(strategies_losses, axis=1).stack().rename("loss")
             stacked_losses = stacked_losses.rename_axis(["family", "i_strategy"])
 
-            min_indices = stacked_losses.groupby("family").idxmin()
+            min_loss_indices = stacked_losses.groupby("family").idxmin()
 
             optimal_indices = [
-                strategies_ids[i_strategy][family].values
-                for family, i_strategy in min_indices.values
+                strategies_ids[i_strategy][
+                    strategies_ids[i_strategy].get_level_values("family") == family
+                ]
+                for family, i_strategy in min_loss_indices.values
             ]
 
-            return pd.MultiIndex.from_tuples(
-                np.concatenate(optimal_indices), names=["model", "family", "store_nbr"]
-            )
+            return get_multiindex(np.concatenate(optimal_indices))
 
         combined_loss = self.filter_combined_loss(
             loss_df=self._loss_to_choose_model_df.copy(),
@@ -259,7 +268,8 @@ class AdvancedPredictor:
         self, families: list[str] = None, test_loss: bool = True
     ):
         loss_df = self._test_loss_df if test_loss else self._loss_to_choose_model_df
-        loss_df = loss_df[loss_df.index.get_level_values("family").isin(families)]
+        if families is not None:
+            loss_df = loss_df[loss_df.index.get_level_values("family").isin(families)]
 
         mean_loss = loss_df.mean(axis=1).rename("loss").reset_index()
         std_loss = loss_df.std(axis=1).rename("std").reset_index()
