@@ -62,6 +62,7 @@ def evaluate(
     evaluate_range: pd.DatetimeIndex,
     stride=1,
     n_jobs=1,
+    disable_tqdm=True,
 ) -> pd.DataFrame:
     def evaluate_family(family: str) -> pd.DataFrame:
         scaler = dataset[family].scaler
@@ -96,7 +97,7 @@ def evaluate(
         return family_losses_df
 
     losses = Parallel(n_jobs=n_jobs)(
-        delayed(evaluate_family)(f) for f in tqdm(models.keys())
+        delayed(evaluate_family)(f) for f in tqdm(models.keys(), disable=disable_tqdm)
     )
 
     return pd.concat(losses)
