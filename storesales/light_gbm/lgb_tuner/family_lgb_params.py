@@ -38,7 +38,7 @@ class FamilyLightGBMModelParams:
 
 @dataclass
 class FamilyLightGBMModelBaseParams:
-    lags: dict[str, int]
+    lags: dict[str, int] | int
     lags_future_covariates: list[int]
     lags_past_covariates: list[str]
     categorical_static_covariates: list[str] | None = None
