@@ -43,6 +43,16 @@ def save_submission(df: pd.DataFrame, file_name: str):
     return submission_df
 
 
+def make_sales_plot(family: str, store_nbr: int, df: pd.DataFrame):
+    mask = (df["family"] == family) & (df["store_nbr"] == store_nbr)
+    sales_df = df[mask][["date", "sales"]].set_index("date")
+    sales_df.plot(title=f"{family} :: Store {store_nbr}", figsize=(12, 6))
+    plt.ylabel("Sales")
+    plt.xlabel("Date")
+    plt.grid()
+    plt.show()
+
+
 def make_submission_forecast_plot(
     train_df: pd.DataFrame,
     forecast: pd.DataFrame,
