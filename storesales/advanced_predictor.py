@@ -30,8 +30,6 @@ class AdvancedPredictor:
         self.lightgbm_model_prediction_df = lightgbm_model_prediction_df
         self.lightgbm_model_name = lightgbm_model_name
 
-        self.min_loss_ids = None
-
         self._baseline_models = self._load_baseline_models()
         self._baseline_losses = self._load_baseline_losses()
 
@@ -199,20 +197,21 @@ class AdvancedPredictor:
         Get optimal predictions based on minimum loss.
         """
 
-        self.min_loss_ids = self.get_optimal_model_ids(
+        min_loss_ids = self.get_optimal_model_ids(
             models, lightgbm_drop_families, strategy, use_std
         )
 
-        return self._combined_prediction.loc[self.min_loss_ids].copy()
+        return self._combined_prediction.loc[min_loss_ids].copy()
 
-    def make_model_selection_plot(self):
+    @staticmethod
+    def make_model_selection_plot(min_loss_ids, families=None):
         """
         Create a bar plot showing the number of times each model is selected
         for each family based on the minimum loss.
         """
         # Extract family and model from self.min_loss_ids
         selection_counts = (
-            self.min_loss_ids.to_frame(index=False)
+            min_loss_ids.to_frame(index=False)
             .groupby(["family", "model"])
             .size()
             .reset_index(name="count")
@@ -221,6 +220,9 @@ class AdvancedPredictor:
         selection_pivot = selection_counts.pivot(
             index="family", columns="model", values="count"
         ).fillna(0)
+
+        if families is not None:
+            selection_pivot = selection_pivot.loc[families]
 
         palette = sns.color_palette(
             "dark:#5A9_r", n_colors=len(selection_pivot.columns)
@@ -265,7 +267,7 @@ class AdvancedPredictor:
         plt.show()
 
     def make_overall_family_loss_plot(
-        self, families: list[str] = None, test_loss: bool = True
+        self, families: list[str] = None, test_loss: bool = True, plot_std: bool = False
     ):
         loss_df = self._test_loss_df if test_loss else self._loss_to_choose_model_df
         if families is not None:
@@ -278,13 +280,13 @@ class AdvancedPredictor:
         family_mean_loss = (
             mean_loss.groupby(["family", "model"])["loss"].mean().reset_index()
         )
-        family_variance_loss = (
+        family_std_loss = (
             std_loss.groupby(["family", "model"])["std"].mean().reset_index()
         )
 
         # Merge mean and variance data
         family_loss_data: pd.DataFrame = family_mean_loss.merge(
-            family_variance_loss, on=["family", "model"]
+            family_std_loss, on=["family", "model"]
         )
 
         # Pivot for plotting
@@ -307,15 +309,16 @@ class AdvancedPredictor:
         plt.tight_layout()
         plt.show()
 
-        # Create the second plot for variance
-        std_pivot.plot(kind="bar", width=0.7, color=colors, figsize=(20, 10))
-        plt.title("Std by Model for Each Family", fontsize=18)
-        plt.xlabel("Family", fontsize=16)
-        plt.ylabel("Std", fontsize=16)
-        plt.xticks(rotation=90, fontsize=16)
-        plt.yticks(fontsize=16)
-        plt.tight_layout()
-        plt.show()
+        # Create the second plot for std
+        if plot_std:
+            std_pivot.plot(kind="bar", width=0.7, color=colors, figsize=(20, 10))
+            plt.title("Std by Model for Each Family", fontsize=18)
+            plt.xlabel("Family", fontsize=16)
+            plt.ylabel("Std", fontsize=16)
+            plt.xticks(rotation=90, fontsize=16)
+            plt.yticks(fontsize=16)
+            plt.tight_layout()
+            plt.show()
 
     def _load_baseline_losses(self):
         losses = {}
