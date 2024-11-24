@@ -62,7 +62,7 @@ def drop_before_last_none(group: pd.DataFrame) -> pd.DataFrame:
 
     if last_none_index is not None:
         if last_none_index < group.index.max():
-            return group.iloc[last_none_index + 1:]
+            return group.iloc[last_none_index + 1 :]
         return pd.DataFrame()
 
     return group
@@ -90,6 +90,7 @@ def preprocess(
     - remove leading zeros (sequences after transforming will have different lengths);
     - replace zero gaps with None where gap size is greater than `zero_gap_size_to_replace`;
     - interpolate missing sales values.
+    - clip sales values based on the specified quantile.
     """
     df = df.drop(columns="id")
 
@@ -124,7 +125,9 @@ def preprocess(
     if clipping_quantile is not None:
         df = (
             df.groupby(["store_nbr", "family"])
-            .apply(clip_sales, clipping_quantile=clipping_quantile)
+            .apply(
+                clip_sales, clipping_quantile=clipping_quantile, include_groups=False
+            )
             .reset_index(level=["store_nbr", "family"])
         )
 
