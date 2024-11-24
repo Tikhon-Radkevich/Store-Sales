@@ -60,7 +60,7 @@ def drop_before_last_none(group: pd.DataFrame) -> pd.DataFrame:
     """Drop all rows before the last None (NaN) value in the 'sales' column."""
     last_none_index = group["sales"][group["sales"].isna()].index.max()
 
-    if last_none_index is not None:
+    if not pd.isna(last_none_index):
         if last_none_index < group.index.max():
             return group.iloc[last_none_index + 1 :]
         return pd.DataFrame()
