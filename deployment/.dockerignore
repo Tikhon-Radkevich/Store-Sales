@@ -3,7 +3,7 @@ reports/
 notebooks/
 data_exploration_app/
 scripts/
-#models/
+models/
 
 
 # Data
