@@ -15,7 +15,7 @@ class BaselineModel:
         mask = (data_df["family"] == family) & (data_df["store_nbr"] == store_nbr)
         family_data_df = data_df[mask]
 
-        self.model.fit(family_data_df)
+        self.model.fit(family_data_df, disable_tqdm=True)
 
         forecast_start = family_data_df["ds"].max() + pd.Timedelta(days=1)
         forecast_end = forecast_start + pd.Timedelta(days=15)
@@ -23,7 +23,7 @@ class BaselineModel:
         forecast = forecast.to_frame(name="date")
         forecast[["family", "store_nbr"]] = family, store_nbr
 
-        prediction = self.model.predict(forecast)
+        prediction = self.model.predict(forecast, disable_tqdm=True)
         prediction.rename(columns={"yhat": "sales"}, inplace=True)
 
         return prediction[["date", "sales"]]
@@ -91,7 +91,7 @@ class SalesPredictor:
     def make_prediction(self, family: str, store_nbr: int):
         model_name = self.family_store_to_model_dict[(family, store_nbr)]
         prediction = self.models[model_name].make_prediction(family, store_nbr)
-        return prediction.to_json()
+        return {"model": model_name, "prediction": prediction.to_dict()}
 
     def load_models(self):
         models = {}
