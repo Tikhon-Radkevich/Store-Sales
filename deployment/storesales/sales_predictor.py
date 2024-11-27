@@ -90,7 +90,8 @@ class SalesPredictor:
 
     def make_prediction(self, family: str, store_nbr: int):
         model_name = self.family_store_to_model_dict[(family, store_nbr)]
-        return self.models[model_name].make_prediction(family, store_nbr)
+        prediction = self.models[model_name].make_prediction(family, store_nbr)
+        return prediction.to_json()
 
     def load_models(self):
         models = {}
