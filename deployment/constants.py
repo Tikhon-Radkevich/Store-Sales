@@ -18,7 +18,7 @@ FAMILY_STORE_TO_MODEL_CSV_FILE_PATH = os.path.join(
 
 LIGHTGBM_FAMILIES = ["HOME AND KITCHEN I", "LIQUOR,WINE,BEER"]
 
-BASELINE_MODEL_FILE_PATHS = [
+BASELINE_MODEL_FILE_NAMES = [
     "daily_predictor.pkl",
     "day_of_week_predictor.pkl",
     "weighted_day_predictor.pkl",
