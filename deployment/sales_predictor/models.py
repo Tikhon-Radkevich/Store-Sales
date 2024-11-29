@@ -22,7 +22,7 @@ class TestModel:
 
     def __init__(self, *args, **kwargs): ...
 
-    def make_prediction(self, *_args, **_kwargs):
+    def make_prediction(self, *_args, **_kwargs) -> pd.DataFrame:
         return self.test_prediction_df
 
 
@@ -32,7 +32,7 @@ class BaselineModel:
         self.data_file_path = data_file_path
         self.model = load_picle(model_file_path)
 
-    def make_prediction(self, family: str, store_nbr: int):
+    def make_prediction(self, family: str, store_nbr: int) -> pd.DataFrame:
         data_df = pd.read_csv(self.data_file_path, parse_dates=["ds"])
         mask = (data_df["family"] == family) & (data_df["store_nbr"] == store_nbr)
         family_data_df = data_df[mask]
@@ -65,16 +65,13 @@ class LightGBM:
             models[family] = load_picle(model_file_path)
         return models
 
-    def make_prediction(self, family: str, store_nbr: int):
+    def make_prediction(self, family: str, store_nbr: int) -> pd.DataFrame:
         family_dataset_file_path = self.lightgbms_info[family]["data_file_path"]
 
         with open(family_dataset_file_path, "rb") as file:
             family_dataset = pickle.load(file)
 
-        # todo: process series before to use family_dataset.get_inputs();
-        # todo: add scaling.
-        cut_timestamp = pd.Timestamp("2017-04-12")
-        inputs = family_dataset.get_cut_inputs(cut_timestamp)
+        inputs = family_dataset.get_inputs()
 
         model = self.models[family]
         predictions = model.predict(n=16, **inputs, show_warnings=False)
@@ -82,6 +79,9 @@ class LightGBM:
         store_index = family_dataset.stores.index(store_nbr)
 
         prediction = predictions[store_index].pd_dataframe()
+        prediction["sales"] = family_dataset.scaler.inverse_transform_by_key(
+            prediction["sales"], family, store_nbr
+        )
         prediction.columns.name = None
 
         return prediction.reset_index()
