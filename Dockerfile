@@ -1,11 +1,12 @@
 FROM python:3.10
 
-COPY deployment/requirements.txt .
+COPY /deployment/requirements.txt .
 
 RUN pip install -r requirements.txt
 
 COPY deployment deployment
-#COPY storesales storesales
+COPY storesales storesales
+COPY config.py .
 
 EXPOSE 8000
 
