@@ -1,6 +1,7 @@
 import os
 
-from deployment.storesales_api.sales_predictor import SalesPredictor, TestBaselineModel, TestLightGBM, BaselineModel, LightGBM
+from deployment.sales_predictor.models import TestModel, BaselineModel, LightGBM
+from deployment.sales_predictor.sales_predictor import SalesPredictor
 
 from deployment.constants import (
     LIGHTGBM_FAMILIES,
@@ -11,14 +12,14 @@ from deployment.constants import (
     BASELINE_MODEL_NAMES,
     BASELINE_DATA_FILE_PATH,
     FAMILY_STORE_TO_MODEL_CSV_FILE_PATH,
-    DEV_RUN_MODE
+    DEV_RUN_MODE,
 )
 
 
 def initialize_sales_predictor() -> SalesPredictor:
     if DEV_RUN_MODE:
-        baseline_predictor = TestBaselineModel
-        lightgbm_predictor = TestLightGBM
+        baseline_predictor = TestModel
+        lightgbm_predictor = TestModel
     else:
         baseline_predictor = BaselineModel
         lightgbm_predictor = LightGBM
