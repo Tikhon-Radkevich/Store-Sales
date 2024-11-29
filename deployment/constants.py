@@ -1,8 +1,9 @@
 import os
 
 
+DEV_RUN_MODE = True
+
 ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
-print(ROOT_PATH)
 
 DATA_DIR_PATH = os.path.join(ROOT_PATH, "data")
 BASELINE_DATA_DIR_PATH = os.path.join(DATA_DIR_PATH, "baseline")
