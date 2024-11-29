@@ -42,11 +42,11 @@ class BaselineModel:
         forecast_start = family_data_df["ds"].max() + pd.Timedelta(days=1)
         forecast_end = forecast_start + pd.Timedelta(days=15)
         forecast = pd.date_range(forecast_start, forecast_end, freq="D")
-        forecast = forecast.to_frame(name="date")
+        forecast = forecast.to_frame(name="ds")
         forecast[["family", "store_nbr"]] = family, store_nbr
 
         prediction = self.model.predict(forecast, disable_tqdm=True)
-        prediction.rename(columns={"yhat": "sales"}, inplace=True)
+        prediction.rename(columns={"yhat": "sales", "ds": "date"}, inplace=True)
 
         return prediction[["date", "sales"]]
 
