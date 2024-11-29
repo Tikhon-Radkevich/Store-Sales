@@ -1,14 +1,44 @@
 import pickle
 
 import pandas as pd
-from darts.models import LightGBMModel
+import numpy as np
+
+
+def load_picle(file_path):
+    with open(file_path, "rb") as f:
+        return pickle.load(f)
+
+
+test_dates = pd.date_range(start=pd.Timestamp.now().normalize(), periods=16, freq="D")
+prediction_values = np.random.rand(16) * 100
+
+test_prediction_df = pd.DataFrame({
+    "date": test_dates,
+    "sales": prediction_values
+})
+
+
+class TestBaselineModel:
+    def __init__(self, model_file_path: str, name: str, data_file_path: str):
+        ...
+
+    def make_prediction(self, family: str, store_nbr: int):
+        return test_prediction_df
+
+
+class TestLightGBM:
+    def __init__(self, lightgbms_info: dict):
+        ...
+
+    def make_prediction(self, family: str, store_nbr: int):
+        return test_prediction_df
 
 
 class BaselineModel:
     def __init__(self, model_file_path: str, name: str, data_file_path: str):
         self.name = name
         self.data_file_path = data_file_path
-        self.model = self.load_model(model_file_path)
+        self.model = load_picle(model_file_path)
 
     def make_prediction(self, family: str, store_nbr: int):
         data_df = pd.read_csv(self.data_file_path, parse_dates=["ds"])
@@ -28,11 +58,6 @@ class BaselineModel:
 
         return prediction[["date", "sales"]]
 
-    @staticmethod
-    def load_model(file_path):
-        with open(file_path, "rb") as f:
-            return pickle.load(f)
-
 
 class LightGBM:
     def __init__(self, lightgbms_info: dict):
@@ -45,7 +70,7 @@ class LightGBM:
 
         for family, info in self.lightgbms_info.items():
             model_file_path = info["model_file_path"]
-            models[family] = LightGBMModel.load(model_file_path)
+            models[family] = load_picle(model_file_path)
         return models
 
     def make_prediction(self, family: str, store_nbr: int):
@@ -73,12 +98,17 @@ class LightGBM:
 class SalesPredictor:
     def __init__(
         self,
+        baseline_predictor,
+        lightgbm_predictor,
         lightgbms_info: dict,
         baseline_model_paths: list[str],
         baseline_model_names: list[str],
         baseline_data_file_path: str,
         family_store_to_model_csv_file_path: str,
     ):
+        self.baseline_predictor = baseline_predictor
+        self.lightgbm_predictor = lightgbm_predictor
+
         self.lightgbms_info = lightgbms_info
         self.baseline_model_paths = baseline_model_paths
         self.baseline_model_names = baseline_model_names
@@ -99,11 +129,11 @@ class SalesPredictor:
         for file_path, model_name in zip(
             self.baseline_model_paths, self.baseline_model_names
         ):
-            models[model_name] = BaselineModel(
+            models[model_name] = self.baseline_predictor(
                 file_path, model_name, self.baseline_data_file_path
             )
 
-        models["LightGBM"] = LightGBM(self.lightgbms_info)
+        models["LightGBM"] = self.lightgbm_predictor(self.lightgbms_info)
 
         return models
 
