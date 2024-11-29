@@ -1,11 +1,12 @@
 FROM python:3.10
 
-WORKDIR /app
-
 COPY deployment/requirements.txt .
 
 RUN pip install -r requirements.txt
 
-COPY deployment .
+COPY deployment deployment
+#COPY storesales storesales
 
-CMD ["python3", "deployment/storesales/model_api.py"]
+EXPOSE 8000
+
+CMD ["uvicorn", "deployment.sales_api.model_api:app", "--host", "0.0.0.0", "--port", "8000"]
