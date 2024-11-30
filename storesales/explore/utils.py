@@ -107,8 +107,6 @@ def get_holidays_on_sales_fig(
         x=END_SUBMISSION_DATE, line_width=2, line_dash="dash", line_color="white"
     )
 
-    # add annotations, x - mean of the start and end date of the test period
-
     fig.add_annotation(
         x=pd.to_datetime(START_SUBMISSION_DATE) + pd.DateOffset(days=7),
         y=max(sales_df["sales"]),
@@ -118,7 +116,6 @@ def get_holidays_on_sales_fig(
         ay=0,
     )
 
-    # Update layout
     fig.update_layout(
         title="Sales Data with Holiday Events",
         xaxis_title="Date",
