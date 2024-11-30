@@ -8,8 +8,7 @@ import matplotlib.pyplot as plt
 from darts.models import LightGBMModel
 
 from storesales.light_gbm.dataset import FamilyDataset
-from storesales.light_gbm.constants import LIGHT_GBM_MODELS_DIR_PATH
-from storesales.constants import EXTERNAL_TEST_PATH
+from storesales.constants import EXTERNAL_TEST_PATH, LIGHT_GBM_MODELS_DIR_PATH
 
 
 def plot_feature_importance(lgb_model: LightGBMModel, n_top_features: int = 30):
