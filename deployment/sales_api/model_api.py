@@ -18,3 +18,20 @@ class PredictionRequest(BaseModel):
 async def make_prediction(request: PredictionRequest):
     prediction = predictor.make_prediction(request.family, request.store_nbr)
     return prediction
+
+
+@app.get("/info")
+async def get_info():
+    family_store_to_model_df = predictor.family_store_to_model_df.reset_index()
+    available_families = family_store_to_model_df["family"].unique().tolist()
+
+    family_store_to_model = (
+        family_store_to_model_df.groupby("family")
+        .apply(lambda group: dict(zip(group["store_nbr"], group["model"])))
+        .to_dict()
+    )
+    response = {
+        "families": available_families,
+        "family_store_to_model": family_store_to_model,
+    }
+    return response
