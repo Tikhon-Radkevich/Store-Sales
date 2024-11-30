@@ -9,6 +9,9 @@ DATA_PATH = os.path.join(ROOT_PATH, "data")
 EXTERNAL_DATA_PATH = os.path.join(DATA_PATH, "external")
 LOSSES_DATA_PATH = os.path.join(DATA_PATH, "losses")
 MODELS_PATH = os.path.join(ROOT_PATH, "models")
+BASELINE_MODELS_PATH = os.path.join(MODELS_PATH, "baseline")
+LIGHT_GBM_MODELS_DIR_PATH = os.path.join(MODELS_PATH, "light_gbm")
+FAMILY_STORE_TO_MODEL_CSV_PATH = os.path.join(MODELS_PATH, "family_store_to_model.csv")
 
 DATASET_FILES = (
     "train.csv",
