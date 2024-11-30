@@ -21,7 +21,10 @@ class SalesPredictor:
         self.baseline_data_file_path = baseline_data_file_path
         self.family_store_to_model_csv_file_path = family_store_to_model_csv_file_path
 
-        self.family_store_to_model_dict = self.load_family_store_to_model_dict()
+        self.family_store_to_model_df = self.load_family_store_to_model_df()
+        self.family_store_to_model_dict = self.family_store_to_model_df.to_dict()[
+            "model"
+        ]
         self.models = self.load_models()
 
     def make_prediction(self, family: str, store_nbr: int):
@@ -43,8 +46,7 @@ class SalesPredictor:
 
         return models
 
-    def load_family_store_to_model_dict(self):
+    def load_family_store_to_model_df(self) -> pd.DataFrame:
         file_path = self.family_store_to_model_csv_file_path
         index_cols = ["family", "store_nbr"]
-        family_store_to_model = pd.read_csv(file_path, index_col=index_cols)
-        return family_store_to_model.to_dict()["model"]
+        return pd.read_csv(file_path, index_col=index_cols)
