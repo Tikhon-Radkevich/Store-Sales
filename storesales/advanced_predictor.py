@@ -204,14 +204,14 @@ class AdvancedPredictor:
         return self._combined_prediction.loc[min_loss_ids].copy()
 
     @staticmethod
-    def make_model_selection_plot(min_loss_ids, families=None):
+    def make_model_selection_plot(models_ids, families=None):
         """
         Create a bar plot showing the number of times each model is selected
         for each family based on the minimum loss.
         """
         # Extract family and model from self.min_loss_ids
         selection_counts = (
-            min_loss_ids.to_frame(index=False)
+            models_ids.to_frame(index=False)
             .groupby(["family", "model"])
             .size()
             .reset_index(name="count")
