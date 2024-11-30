@@ -4,7 +4,6 @@ from deployment.sales_predictor.models import TestModel, BaselineModel, LightGBM
 from deployment.sales_predictor.sales_predictor import SalesPredictor
 
 from deployment.constants import (
-    LIGHTGBM_FAMILIES,
     LIGHTGBM_MODELS_DIR_PATH,
     LIGHTGBM_DATA_DIR_PATH,
     BASELINE_MODELS_DIR_PATH,
@@ -48,11 +47,11 @@ def get_baseline_model_paths() -> list:
 def get_lightgbms_info() -> dict:
     lightgbms_info = {}
 
-    for family in LIGHTGBM_FAMILIES:
-        model_path = os.path.join(LIGHTGBM_MODELS_DIR_PATH, family, "model.darts")
-        data_path = os.path.join(LIGHTGBM_DATA_DIR_PATH, family, "family_dataset.pkl")
+    for family_dir in os.listdir(LIGHTGBM_MODELS_DIR_PATH):
+        model_path = os.path.join(LIGHTGBM_MODELS_DIR_PATH, family_dir, "model.darts")
+        data_path = os.path.join(LIGHTGBM_DATA_DIR_PATH, family_dir, "family_dataset.pkl")
 
-        lightgbms_info[family] = {
+        lightgbms_info[family_dir] = {
             "model_file_path": model_path,
             "data_file_path": data_path,
         }
