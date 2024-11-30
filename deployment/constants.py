@@ -1,7 +1,7 @@
 import os
 
 
-DEV_RUN_MODE = True
+DEV_RUN_MODE = False
 
 ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
 
@@ -17,8 +17,6 @@ LIGHTGBM_MODELS_DIR_PATH = os.path.join(MODELS_DIR_PATH, "light_gbm")
 FAMILY_STORE_TO_MODEL_CSV_FILE_PATH = os.path.join(
     MODELS_DIR_PATH, "family_store_to_model.csv"
 )
-
-LIGHTGBM_FAMILIES = ["HOME AND KITCHEN I", "LIQUOR,WINE,BEER"]
 
 BASELINE_MODEL_FILE_NAMES = [
     "daily_predictor.pkl",
