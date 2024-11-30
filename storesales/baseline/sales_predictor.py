@@ -10,7 +10,7 @@ import numpy as np
 import optuna
 
 from storesales.baseline.model_wrappers import ModelBaseWrapper
-from storesales.constants import MODELS_PATH
+from storesales.constants import BASELINE_MODELS_PATH
 
 
 class SalesPredictor:
@@ -111,7 +111,7 @@ class SalesPredictor:
 
     @staticmethod
     def load(model_name: str) -> "SalesPredictor":
-        model_file_path = os.path.join(MODELS_PATH, model_name)
+        model_file_path = os.path.join(BASELINE_MODELS_PATH, model_name)
         with open(model_file_path, "rb") as f:
             return pickle.load(f)
 
