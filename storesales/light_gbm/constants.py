@@ -1,8 +1,4 @@
-import os
-
 import pandas as pd
-
-from config import ROOT_PATH
 
 
 TRAINING_DATA_THRESHOLD_TIMESTAMP = pd.Timestamp("2016-06-01")
@@ -14,5 +10,3 @@ FEATURES_TO_ROLL = ["sales", "onpromotion", "dcoilwtico"]
 STATIC_COLS = ["city", "state", "type", "cluster"]
 CAT_STATIC_COVS = ["city", "state", "type", "cluster", "store_nbr"]
 CAT_FUTURE_COVS = []
-
-LIGHT_GBM_MODELS_DIR_PATH = os.path.join(ROOT_PATH, "models", "light_gbm")
