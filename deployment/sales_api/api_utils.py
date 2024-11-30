@@ -49,7 +49,9 @@ def get_lightgbms_info() -> dict:
 
     for family_dir in os.listdir(LIGHTGBM_MODELS_DIR_PATH):
         model_path = os.path.join(LIGHTGBM_MODELS_DIR_PATH, family_dir, "model.darts")
-        data_path = os.path.join(LIGHTGBM_DATA_DIR_PATH, family_dir, "family_dataset.pkl")
+        data_path = os.path.join(
+            LIGHTGBM_DATA_DIR_PATH, family_dir, "family_dataset.pkl"
+        )
 
         lightgbms_info[family_dir] = {
             "model_file_path": model_path,
